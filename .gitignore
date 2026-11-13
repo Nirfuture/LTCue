@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/build/
+artifacts/
+/releases/
+.idea/
+.vs/
+**/phase2-settings.json
+**/sync-logs/
+*.user
+*.suo

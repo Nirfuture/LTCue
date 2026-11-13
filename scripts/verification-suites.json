@@ -1,0 +1,303 @@
+{
+  "Version": 1,
+  "Suites": [
+    {
+      "Name": "preview-clip",
+      "Count": 8,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "timing-status",
+      "Count": 8,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "settings-apply",
+      "Count": 14,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "coordinator",
+      "Count": 11,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "rendering-health",
+      "Count": 8,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "playback-integration",
+      "Count": 14,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "shared-canvas",
+      "Count": 8,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "presentation",
+      "Count": 14,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "audio-foundation",
+      "Count": 12,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "audio-decode",
+      "Count": 8,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "audio-service",
+      "Count": 8,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "audio-connected",
+      "Count": 8,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "audio-ui",
+      "Count": 7,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "input-level",
+      "Count": 6,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "ui-design",
+      "Count": 5,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "preview-ui",
+      "Count": 7,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "ui-corrections",
+      "Count": 8,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "cue-ux",
+      "Count": 8,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "manual-output",
+      "Count": 8,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "responsive",
+      "Count": 8,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "output-mode",
+      "Count": 6,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "resume-latency",
+      "Count": 3,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "portrait-monitor",
+      "Count": 0,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "release-features",
+      "Count": 5,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "default-show",
+      "Count": 5,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "preview-recovery",
+      "Count": 2,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "delivery-operations",
+      "Count": 9,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "phase2-adapter",
+      "Count": 12,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "phase5",
+      "Count": 12,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "ui-update",
+      "Count": 11,
+      "Evidence": "ui-results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "resize-anchor",
+      "Count": 40,
+      "Evidence": "resize.json",
+      "Kind": "Resize",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "sync-recovery-output",
+      "Count": 1,
+      "Evidence": "sync-output.json",
+      "Kind": "Passed",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "preview-performance",
+      "Count": 6,
+      "Evidence": "performance.json",
+      "Kind": "Performance",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "monitor",
+      "Count": 4,
+      "Evidence": "gpu-monitor.json",
+      "Kind": "Monitor",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "time-display",
+      "Count": 5,
+      "Evidence": "display-format.json",
+      "Kind": "Display",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "audio-start",
+      "Count": 6,
+      "Evidence": "latency.json",
+      "Kind": "AudioStart",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "live-startup",
+      "Mode": "Manual",
+      "Reason": "Requires an external LTC source and a separate physical-input test."
+    },
+    {
+      "Name": "redesign-baseline",
+      "Mode": "Historical",
+      "Reason": "Pre-migration baseline; not a current-product acceptance test."
+    }
+  ]
+}

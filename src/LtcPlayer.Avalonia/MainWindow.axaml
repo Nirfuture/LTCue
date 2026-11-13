@@ -1,0 +1,162 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:LtcPlayer.Avalonia" xmlns:core="using:LtcPlayer.App" x:Class="LtcPlayer.Avalonia.MainWindow" Title="LTCue" Icon="/Assets/LtcPlayer.ico" WindowStartupLocation="CenterScreen" Width="1640" Height="940" MinWidth="480" MinHeight="420" Background="#12161C">
+ <Window.Resources>
+  <!-- Cell navigation remains functional; row selection and validation retain meaning. -->
+  <ControlTheme x:Key="QuietCueCell" TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+   <Setter Property="Template"><ControlTemplate>
+    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+     <Grid x:Name="PART_CellRoot" ColumnDefinitions="*,Auto">
+      <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" Foreground="{TemplateBinding Foreground}"/>
+      <Rectangle x:Name="InvalidVisualElement" IsVisible="False" IsHitTestVisible="False" Stroke="{DynamicResource DataGridCellInvalidBrush}" StrokeThickness="1"/>
+      <Rectangle x:Name="PART_RightGridLine" Grid.Column="1" Width="1" Fill="{DynamicResource DataGridFillerColumnGridLinesBrush}"/>
+     </Grid>
+    </Border>
+   </ControlTemplate></Setter>
+  </ControlTheme>
+  <local:CueDurationConverter x:Key="CueDuration"/>
+  <DataTemplate x:Key="CenteredHeader"><TextBlock Text="{Binding}" HorizontalAlignment="Center" VerticalAlignment="Center"/></DataTemplate>
+  <!-- Sorting is disabled; reserve no space for an unused sort icon. -->
+  <x:Double x:Key="DataGridSortIconMinWidth">0</x:Double>
+  <SolidColorBrush x:Key="DataGridRowSelectedBackgroundBrush">#204D70</SolidColorBrush>
+  <SolidColorBrush x:Key="DataGridRowSelectedHoveredBackgroundBrush">#285E86</SolidColorBrush>
+  <SolidColorBrush x:Key="DataGridRowSelectedUnfocusedBackgroundBrush">#243E52</SolidColorBrush>
+  <SolidColorBrush x:Key="DataGridRowSelectedHoveredUnfocusedBackgroundBrush">#2B506C</SolidColorBrush>
+  <x:Double x:Key="SliderHorizontalThumbWidth">12</x:Double>
+  <x:Double x:Key="SliderHorizontalThumbHeight">12</x:Double>
+  <CornerRadius x:Key="SliderThumbCornerRadius">6</CornerRadius>
+  <SolidColorBrush x:Key="SliderThumbBackground">#55B2F6</SolidColorBrush>
+  <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver">#8DCEFF</SolidColorBrush>
+  <SolidColorBrush x:Key="SliderThumbBackgroundPressed">#B8E1FF</SolidColorBrush>
+  <SolidColorBrush x:Key="SliderTrackValueFill">#368DCD</SolidColorBrush>
+  <SolidColorBrush x:Key="SliderTrackValueFillPointerOver">#55B2F6</SolidColorBrush>
+  <SolidColorBrush x:Key="SliderTrackValueFillPressed">#55B2F6</SolidColorBrush>
+ </Window.Resources>
+ <Window.Styles>
+  <Style Selector="Button"><Setter Property="Padding" Value="12,8"/></Style>
+  <Style Selector="Border.section"><Setter Property="Background" Value="#1B212A"/><Setter Property="BorderBrush" Value="#303743"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="8"/><Setter Property="Padding" Value="12"/></Style>
+  <Style Selector="TextBlock.section-title"><Setter Property="FontSize" Value="14"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+  <Style Selector="Button.icon"><Setter Property="Padding" Value="6"/><Setter Property="Background" Value="Transparent"/><Setter Property="MinHeight" Value="32"/></Style>
+  <Style Selector="ToggleButton.audio-power"><Setter Property="Padding" Value="7"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="#303743"/></Style>
+  <Style Selector="ToggleButton.audio-power:checked"><Setter Property="Background" Value="#203348"/><Setter Property="Foreground" Value="#55B2F6"/><Setter Property="BorderBrush" Value="#55B2F6"/></Style>
+  <Style Selector="TextBox"><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+  <Style Selector="DataGridColumnHeader"><Setter Property="Padding" Value="6,8"/><Setter Property="FontSize" Value="12"/><Setter Property="MinHeight" Value="38"/></Style>
+  <!-- Headers are labels, not sortable buttons; retain column resizing without hover/press fills. -->
+  <Style Selector="DataGridColumnHeader:pointerover /template/ Grid#PART_ColumnHeaderRoot"><Setter Property="Background" Value="Transparent"/></Style>
+  <Style Selector="DataGridColumnHeader:pressed /template/ Grid#PART_ColumnHeaderRoot"><Setter Property="Background" Value="Transparent"/></Style>
+  <Style Selector="DataGrid CheckBox"><Setter Property="IsEnabled" Value="{Binding !$parent[DataGrid].IsReadOnly}"/></Style>
+  <Style Selector="DataGridCell.drag-handle-cell"><Setter Property="Padding" Value="0"/><Setter Property="VerticalContentAlignment" Value="Stretch"/></Style>
+  <Style Selector="DataGridCell"><Setter Property="Padding" Value="6,4"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+  <Style Selector="TextBox.timecode"><Setter Property="IsReadOnly" Value="{Binding $parent[DataGrid].IsReadOnly}"/><Setter Property="Width" Value="36"/><Setter Property="MinWidth" Value="0"/><Setter Property="MinHeight" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="0"/><Setter Property="TextAlignment" Value="Center"/><Setter Property="FontFamily" Value="Consolas"/><Setter Property="FontSize" Value="14"/><Setter Property="LineHeight" Value="20"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+  <Style Selector="TextBlock.tc-separator"><Setter Property="FontFamily" Value="Consolas"/><Setter Property="FontSize" Value="14"/><Setter Property="LineHeight" Value="20"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+  <Style Selector="Button.cue-play, Button.cue-stop"><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="Height" Value="32"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+  <Style Selector="Slider"><Setter Property="MinHeight" Value="40"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+  <Style Selector="Button#ArmButton:disabled"><Setter Property="Opacity" Value="0.45"/></Style>
+ </Window.Styles>
+ <Grid x:Name="MainLayout" RowDefinitions="Auto,*,Auto" Margin="22">
+  <!-- Keep the workspace anchored when output warnings appear or disappear. -->
+  <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,24" Margin="0,0,0,16">
+   <StackPanel Spacing="3"><TextBlock x:Name="LtcLabel" Text="--:--:--:--" FontFamily="Consolas" FontSize="24" Foreground="#8DCBFF"/><TextBlock x:Name="LtcStateLabel" Text="LTC待機" Foreground="#A5B0BF" FontSize="12"/></StackPanel>
+   <Button x:Name="ArmButton" Grid.Column="1" Content="出力開始" Click="DeliveryClick" Margin="10,0" Foreground="White">
+    <Button.Template><ControlTemplate><Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="16,10"><StackPanel Orientation="Horizontal" Spacing="7"><local:LucideIcon Kind="monitor-up"/><ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"/></StackPanel></Border></ControlTemplate></Button.Template>
+   </Button>
+   <Button x:Name="SettingsButton" Grid.Column="2" Classes="icon" Click="SettingsClick" ToolTip.Tip="設定" AutomationProperties.Name="設定"><local:LucideIcon Kind="settings-2"/></Button>
+   <TextBlock x:Name="DeliveryHint" MaxLines="1" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" Grid.Row="1" Grid.ColumnSpan="3" HorizontalAlignment="Right" MaxWidth="760" TextWrapping="NoWrap" Foreground="#E6B566" Margin="0,4,0,0" IsVisible="False"/>
+  </Grid>
+  <ScrollViewer x:Name="WorkspaceScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
+  <Grid x:Name="Workspace" VerticalAlignment="Top" ColumnDefinitions="*,18,420">
+   <Border x:Name="EditorPane" VerticalAlignment="Top" Background="#1B212A" Padding="14" CornerRadius="8">
+    <Grid RowDefinitions="Auto,*,Auto">
+     <StackPanel x:Name="EditorTools" Orientation="Horizontal" Spacing="7" Margin="0,0,0,12">
+      <Button Content="キュー追加" Click="AddClick"/><Button Content="削除" Click="DeleteClick"/><Button Content="複製" Click="CloneClick"/><Button Content="保存" Click="SaveClick"/><Button Content="読込" Click="LoadClick"/>
+     </StackPanel>
+     <Grid x:Name="CueListViewport" Grid.Row="1" ClipToBounds="True">
+     <DataGrid x:Name="CueGrid" CellTheme="{StaticResource QuietCueCell}" AutoGenerateColumns="False" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single" DragDrop.AllowDrop="True" GridLinesVisibility="Horizontal" RowHeight="48" HeadersVisibility="Column" HorizontalScrollBarVisibility="Auto" Background="Transparent">
+      <DataGrid.Columns>
+       <DataGridTemplateColumn Width="42"><DataGridTemplateColumn.CellTemplate><DataTemplate><Border Classes="cue-drag-handle" AttachedToVisualTree="CueHandleAttached" Background="Transparent" MinHeight="40" Cursor="SizeAll" PointerPressed="HandlePressed" ToolTip.Tip="ドラッグで表示順を変更"><local:LucideIcon Kind="grip-vertical" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False"/></Border></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="有効" HeaderTemplate="{StaticResource CenteredHeader}" IsReadOnly="True" Width="56"><DataGridTemplateColumn.CellTemplate><DataTemplate x:DataType="core:CueRow"><CheckBox Classes="cue-enabled" IsChecked="{Binding Enabled,Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="32" MinHeight="32" AutomationProperties.Name="有効"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="確認" HeaderTemplate="{StaticResource CenteredHeader}" Width="90"><DataGridTemplateColumn.CellTemplate><DataTemplate>
+        <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center"><Button Classes="cue-play" Width="34" MinWidth="0" Padding="4" FontSize="18" ToolTip.Tip="再生" Click="RowPlayClick"><local:LucideIcon Kind="play"/></Button><Button Classes="cue-stop" Width="34" MinWidth="0" Padding="4" FontSize="18" ToolTip.Tip="停止" Click="RowStopClick" IsEnabled="False"><local:LucideIcon Kind="square"/></Button></StackPanel>
+       </DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="動画" Width="*" MinWidth="180"><DataGridTemplateColumn.CellTemplate><DataTemplate><Border Background="Transparent" ContextRequested="CueFileContextRequested" PointerPressed="CueFilePointerPressed"><TextBlock Text="{Binding Name}" ToolTip.Tip="{Binding FilePath}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></Border></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="開始TC" HeaderTemplate="{StaticResource CenteredHeader}" Width="190"><DataGridTemplateColumn.CellTemplate><DataTemplate x:DataType="core:CueRow"><StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Center">
+        <TextBox Classes="timecode" MaxLength="2" Text="{Binding Hours,Mode=TwoWay}"/><TextBlock Classes="tc-separator" Text=":"/><TextBox Classes="timecode" MaxLength="2" Text="{Binding Minutes,Mode=TwoWay}"/><TextBlock Classes="tc-separator" Text=":"/><TextBox Classes="timecode" MaxLength="2" Text="{Binding Seconds,Mode=TwoWay}"/><TextBlock Classes="tc-separator tc-frame-separator" Text=":"/><TextBox Classes="timecode" MaxLength="2" Text="{Binding Frames,Mode=TwoWay}"/>
+       </StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="長さ" HeaderTemplate="{StaticResource CenteredHeader}" Width="112"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Converter={StaticResource CueDuration}}" VerticalAlignment="Center" HorizontalAlignment="Center" FontFamily="Consolas" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Converter={StaticResource CueDuration}}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="fps" HeaderTemplate="{StaticResource CenteredHeader}" Width="64"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding FrameRate,StringFormat=F2}" VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding FrameRate,StringFormat=F2}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="形式" HeaderTemplate="{StaticResource CenteredHeader}" Width="70"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Codec}" VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Codec}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="エラー" Width="126"><DataGridTemplateColumn.CellTemplate><DataTemplate x:DataType="core:CueRow"><TextBlock Text="{Binding IssueText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding IssueText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+      </DataGrid.Columns>
+     </DataGrid>
+     <Canvas IsHitTestVisible="False"><Border x:Name="CueInsertionLine" Height="4" Background="#55B2F6" CornerRadius="2" IsVisible="False"/></Canvas>
+     </Grid>
+     <TextBlock x:Name="ProgramInfo" Grid.Row="2" Foreground="#99A9BA" TextWrapping="Wrap" Margin="0,10,0,0" Text="動画をドロップして登録。表示順と再生順は独立しています。"/>
+    </Grid>
+   </Border>
+   <Grid x:Name="PreviewPane" VerticalAlignment="Top" Grid.Column="2" RowDefinitions="Auto,Auto,Auto">
+    <Border x:Name="PreviewCard" Classes="section" Grid.Row="0">
+     <StackPanel Spacing="6">
+      <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,4">
+       <TextBlock x:Name="ModeLabel" Text="プレビュー" Classes="section-title"/>
+       <TextBlock x:Name="OutputGeometry" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="#A5B0BF" FontSize="12"/>
+      </Grid>
+      <Grid x:Name="PreviewViewport" MinHeight="160" Background="#252E39" ClipToBounds="True">
+       <Border x:Name="OutputFrame" Background="Black" BorderBrush="#55B2F6" BorderThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center"><local:PreviewHost x:Name="PreviewSurface"/></Border>
+      </Grid>
+      <Slider x:Name="Seek" Minimum="0" Maximum="1" KeyUp="SeekKeyUp" ToolTip.Tip="再生位置"/>
+      <Grid ColumnDefinitions="*,*" MinHeight="22">
+       <TextBlock x:Name="PreviewPosition" FontFamily="Consolas" FontSize="14" LineHeight="20" Text="--:--:--:--"/>
+       <TextBlock x:Name="PreviewDuration" Grid.Column="1" HorizontalAlignment="Right" FontFamily="Consolas" FontSize="14" LineHeight="20" Foreground="#A5B0BF" Text="--:--:--:--"/>
+      </Grid>
+      <TextBlock x:Name="PreviewTime" IsVisible="False"/>
+      <Border Height="1" Background="#303743" Margin="0,3"/>
+      <TextBlock x:Name="PreviewName" Text="キューを選択してください" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+      <WrapPanel Orientation="Horizontal">
+       <TextBlock x:Name="VideoTimingStatus" Text="映像：停止中" Margin="0,0,16,0" FontSize="13"/>
+       <TextBlock x:Name="AudioTimingStatus" Text="音声：OFF" FontSize="13"/>
+      </WrapPanel>
+      <TextBlock x:Name="RunInfo" MinHeight="18" MaxLines="1" TextTrimming="CharacterEllipsis" Foreground="#A5B0BF" FontSize="12" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+      <TextBlock x:Name="PreviewInfo" MinHeight="18" MaxLines="1" TextTrimming="CharacterEllipsis" Foreground="#E6B566" FontSize="12" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+      <Grid x:Name="ActivitySlot" Height="28" RowDefinitions="4,*">
+       <ProgressBar x:Name="ActivityBar" Height="4" Opacity="0" IsIndeterminate="False"/>
+       <TextBlock x:Name="ActivityLabel" Grid.Row="1" Opacity="0" FontSize="12" TextTrimming="CharacterEllipsis" Foreground="#8DCBFF"/>
+      </Grid>
+      <TextBlock x:Name="OutputModeLabel" IsVisible="False"/>
+      <TextBlock x:Name="VideoGeometry" IsVisible="False"/>
+     </StackPanel>
+    </Border>
+    <Border Classes="section" Grid.Row="1" Margin="0,12,0,0">
+     <StackPanel x:Name="PreviewControls" Spacing="6">
+      <TextBlock Text="音声" Classes="section-title"/>
+      <Grid ColumnDefinitions="Auto,*,Auto">
+       <ToggleButton x:Name="AudioEnabled" Classes="audio-power" Click="AudioEnabledClick" ToolTip.Tip="音声出力を開始" AutomationProperties.Name="音声出力を開始"><local:LucideIcon x:Name="AudioPowerIcon" Kind="volume-x"/></ToggleButton>
+       <Slider x:Name="Volume" Grid.Column="1" Margin="8,0" Minimum="0" Maximum="1" Value="0.5" ToolTip.Tip="音声出力の音量"/>
+       <TextBlock x:Name="VolumePercent" Grid.Column="2" Text="50%" Width="36" TextAlignment="Right" VerticalAlignment="Center" FontSize="12"/>
+      </Grid>
+     </StackPanel>
+    </Border>
+    <Border Classes="section" Grid.Row="2" Margin="0,12,0,0">
+     <StackPanel Spacing="8">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+       <TextBlock Text="蓋絵" Classes="section-title" VerticalAlignment="Center"/>
+       <TextBlock x:Name="CoverName" Grid.Column="1" Text="未登録（黒）" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="8,0" FontSize="12" Foreground="#A5B0BF"/>
+       <Button x:Name="ChooseCoverButton" Grid.Column="2" Classes="icon" Click="ChooseCoverClick" ToolTip.Tip="画像を登録・変更（出力停止中のみ）" AutomationProperties.Name="蓋絵画像を登録・変更"><StackPanel Orientation="Horizontal" Spacing="5"><local:LucideIcon Kind="image-plus"/><TextBlock Text="変更" FontSize="12"/></StackPanel></Button>
+       <Button x:Name="ClearCoverButton" Grid.Column="3" Classes="icon" Click="ClearCoverClick" ToolTip.Tip="画像を解除して黒を使用" AutomationProperties.Name="蓋絵画像を解除"><local:LucideIcon Kind="x"/></Button>
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+       <ToggleButton x:Name="CoverButton" Click="CoverClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10,8"><StackPanel Orientation="Horizontal" Spacing="7"><local:LucideIcon Kind="layers"/><TextBlock x:Name="CoverActionLabel" Text="蓋絵を表示"/></StackPanel></ToggleButton>
+       <TextBlock Grid.Column="1" Text="フェード" FontSize="12" VerticalAlignment="Center" Margin="10,0,5,0"/>
+       <NumericUpDown x:Name="FadeSeconds" Grid.Column="2" Width="92" Minimum="0" Maximum="60" Increment="0.1" FormatString="0.0" ShowButtonSpinner="False" Value="1" LostFocus="FadeSecondsLostFocus" ToolTip.Tip="0秒で即時切替。往復の両方向に適用、最大60秒。"/>
+       <TextBlock Grid.Column="3" Text="秒" FontSize="12" VerticalAlignment="Center" Margin="5,0,0,0"/>
+      </Grid>
+      <TextBlock x:Name="CoverStatus" Text="映像表示中" MinHeight="18" FontSize="12" Foreground="#A5B0BF"/>
+     </StackPanel>
+    </Border>
+   </Grid>
+  </Grid>
+  </ScrollViewer>
+  <TextBlock x:Name="Status" Grid.Row="2" MaxHeight="64" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" Text="準備中" TextWrapping="Wrap" Margin="0,16,0,0" Foreground="#AFD5F5"/>
+ </Grid>
+</Window>
+
+
+
+

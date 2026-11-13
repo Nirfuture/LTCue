@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+ <ItemGroup>
+  <Compile Include="../../src/LtcPlayer.App/InputSettings.cs" Link="Core/InputSettings.cs" />
+  <Compile Include="../../src/LtcPlayer.App/MasterClock.cs" Link="Core/MasterClock.cs" />
+  <Compile Include="../../src/LtcPlayer.App/CueProgram.cs" Link="Core/CueProgram.cs" />
+  <Compile Include="../../src/LtcPlayer.Avalonia/Playback/ProgramPlayback.cs" Link="Core/ProgramPlayback.cs" />
+  <Compile Include="../../src/LtcPlayer.Avalonia/Playback/FrameBuffer.cs" Link="Core/FrameBuffer.cs" />
+  <Compile Include="../../src/LtcPlayer.Avalonia/Playback/CoverController.cs" Link="Core/CoverController.cs" />
+  <Compile Include="../../src/LtcPlayer.Avalonia/Playback/ProgramPresentationContract.cs" Link="Core/ProgramPresentationContract.cs" />
+ </ItemGroup>
+</Project>

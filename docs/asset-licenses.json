@@ -1,0 +1,24 @@
+[
+  {
+    "Asset": "Lucide icons",
+    "Source": "https://github.com/lucide-icons/lucide",
+    "Version": "vendored SVG paths",
+    "License": "ISC; MIT for Feather-derived icons",
+    "LicenseFile": "LICENSES/Lucide.txt",
+    "SourceDirectory": "src/LtcPlayer.Avalonia/Assets/Lucide",
+    "Icons": [
+      "monitor-up",
+      "grip-vertical",
+      "image-plus",
+      "layers",
+      "pause",
+      "play",
+      "refresh-cw",
+      "settings-2",
+      "square",
+      "volume-2",
+      "volume-x",
+      "x"
+    ]
+  }
+]

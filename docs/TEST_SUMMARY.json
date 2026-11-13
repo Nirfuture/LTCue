@@ -1,0 +1,294 @@
+{
+  "Date": "2026-11-11",
+  "Version": "0.1.0-preview.10",
+  "AutomaticSuites": 35,
+  "ReportedCases": 293,
+  "FailedSuites": 0,
+  "PackageChecks": 8,
+  "SDK": "10.0.203",
+  "SourceMode": "WorkingTreeSnapshot",
+  "Evidence": "artifacts/candidate-qa-preview.10-checked/automatic",
+  "ProductGuiStartup": "Not performed: Computer Use app approval timed out",
+  "PhysicalValidation": "Not performed",
+  "Results": [
+    {
+      "Suite": "sync-calculation",
+      "Status": "PASS",
+      "Count": 7,
+      "ExitCode": 0,
+      "Seconds": 24.4051705
+    },
+    {
+      "Suite": "settings-apply",
+      "Status": "PASS",
+      "Count": 14,
+      "ExitCode": 0,
+      "Seconds": 3.6535682,
+      "Error": null
+    },
+    {
+      "Suite": "coordinator",
+      "Status": "PASS",
+      "Count": 11,
+      "ExitCode": 0,
+      "Seconds": 3.3276611,
+      "Error": null
+    },
+    {
+      "Suite": "rendering-health",
+      "Status": "PASS",
+      "Count": 7,
+      "ExitCode": 0,
+      "Seconds": 2.7624277,
+      "Error": null
+    },
+    {
+      "Suite": "playback-integration",
+      "Status": "PASS",
+      "Count": 13,
+      "ExitCode": 0,
+      "Seconds": 5.3425656,
+      "Error": null
+    },
+    {
+      "Suite": "shared-canvas",
+      "Status": "PASS",
+      "Count": 8,
+      "ExitCode": 0,
+      "Seconds": 3.323286,
+      "Error": null
+    },
+    {
+      "Suite": "presentation",
+      "Status": "PASS",
+      "Count": 14,
+      "ExitCode": 0,
+      "Seconds": 4.7844989,
+      "Error": null
+    },
+    {
+      "Suite": "audio-foundation",
+      "Status": "PASS",
+      "Count": 12,
+      "ExitCode": 0,
+      "Seconds": 9.7129632,
+      "Error": null
+    },
+    {
+      "Suite": "audio-decode",
+      "Status": "PASS",
+      "Count": 7,
+      "ExitCode": 0,
+      "Seconds": 2.1316043,
+      "Error": null
+    },
+    {
+      "Suite": "audio-service",
+      "Status": "PASS",
+      "Count": 8,
+      "ExitCode": 0,
+      "Seconds": 3.2814942,
+      "Error": null
+    },
+    {
+      "Suite": "audio-connected",
+      "Status": "PASS",
+      "Count": 6,
+      "ExitCode": 0,
+      "Seconds": 2.7795474,
+      "Error": null
+    },
+    {
+      "Suite": "audio-ui",
+      "Status": "PASS",
+      "Count": 7,
+      "ExitCode": 0,
+      "Seconds": 2.3705963,
+      "Error": null
+    },
+    {
+      "Suite": "input-level",
+      "Status": "PASS",
+      "Count": 6,
+      "ExitCode": 0,
+      "Seconds": 2.055332,
+      "Error": null
+    },
+    {
+      "Suite": "ui-design",
+      "Status": "PASS",
+      "Count": 5,
+      "ExitCode": 0,
+      "Seconds": 3.3430679,
+      "Error": null
+    },
+    {
+      "Suite": "preview-ui",
+      "Status": "PASS",
+      "Count": 7,
+      "ExitCode": 0,
+      "Seconds": 4.1481699,
+      "Error": null
+    },
+    {
+      "Suite": "ui-corrections",
+      "Status": "PASS",
+      "Count": 8,
+      "ExitCode": 0,
+      "Seconds": 8.8890256,
+      "Error": null
+    },
+    {
+      "Suite": "cue-ux",
+      "Status": "PASS",
+      "Count": 8,
+      "ExitCode": 0,
+      "Seconds": 2.311795,
+      "Error": null
+    },
+    {
+      "Suite": "manual-output",
+      "Status": "PASS",
+      "Count": 8,
+      "ExitCode": 0,
+      "Seconds": 15.9343462,
+      "Error": null
+    },
+    {
+      "Suite": "responsive",
+      "Status": "PASS",
+      "Count": 8,
+      "ExitCode": 0,
+      "Seconds": 3.5750892,
+      "Error": null
+    },
+    {
+      "Suite": "output-mode",
+      "Status": "PASS",
+      "Count": 6,
+      "ExitCode": 0,
+      "Seconds": 2.0432791,
+      "Error": null
+    },
+    {
+      "Suite": "resume-latency",
+      "Status": "PASS",
+      "Count": 3,
+      "ExitCode": 0,
+      "Seconds": 1.646535,
+      "Error": null
+    },
+    {
+      "Suite": "portrait-monitor",
+      "Status": "PASS",
+      "Count": 2,
+      "ExitCode": 0,
+      "Seconds": 2.1236903,
+      "Error": null
+    },
+    {
+      "Suite": "release-features",
+      "Status": "PASS",
+      "Count": 5,
+      "ExitCode": 0,
+      "Seconds": 3.6424529,
+      "Error": null
+    },
+    {
+      "Suite": "default-show",
+      "Status": "PASS",
+      "Count": 5,
+      "ExitCode": 0,
+      "Seconds": 3.1117778,
+      "Error": null
+    },
+    {
+      "Suite": "preview-recovery",
+      "Status": "PASS",
+      "Count": 2,
+      "ExitCode": 0,
+      "Seconds": 7.1062343,
+      "Error": null
+    },
+    {
+      "Suite": "delivery-operations",
+      "Status": "PASS",
+      "Count": 9,
+      "ExitCode": 0,
+      "Seconds": 2.1172173,
+      "Error": null
+    },
+    {
+      "Suite": "phase2-adapter",
+      "Status": "PASS",
+      "Count": 12,
+      "ExitCode": 0,
+      "Seconds": 6.1692718,
+      "Error": null
+    },
+    {
+      "Suite": "phase5",
+      "Status": "PASS",
+      "Count": 12,
+      "ExitCode": 0,
+      "Seconds": 7.8380298,
+      "Error": null
+    },
+    {
+      "Suite": "ui-update",
+      "Status": "PASS",
+      "Count": 11,
+      "ExitCode": 0,
+      "Seconds": 3.2496182,
+      "Error": null
+    },
+    {
+      "Suite": "resize-anchor",
+      "Status": "PASS",
+      "Count": 40,
+      "ExitCode": 0,
+      "Seconds": 6.9956515,
+      "Error": null
+    },
+    {
+      "Suite": "sync-recovery-output",
+      "Status": "PASS",
+      "Count": 1,
+      "ExitCode": 0,
+      "Seconds": 2.9621236,
+      "Error": null
+    },
+    {
+      "Suite": "preview-performance",
+      "Status": "PASS",
+      "Count": 6,
+      "ExitCode": 0,
+      "Seconds": 5.4658571,
+      "Error": null
+    },
+    {
+      "Suite": "monitor",
+      "Status": "PASS",
+      "Count": 4,
+      "ExitCode": 0,
+      "Seconds": 3.463188,
+      "Error": null
+    },
+    {
+      "Suite": "time-display",
+      "Status": "PASS",
+      "Count": 5,
+      "ExitCode": 0,
+      "Seconds": 1.146621,
+      "Error": null
+    },
+    {
+      "Suite": "audio-start",
+      "Status": "PASS",
+      "Count": 6,
+      "ExitCode": 0,
+      "Seconds": 2.3263303,
+      "Error": null
+    }
+  ]
+}

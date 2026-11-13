@@ -1,0 +1,152 @@
+[
+  {
+    "Package": "Avalonia",
+    "Version": "11.3.21",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "Avalonia.Angle.Windows.Natives",
+    "Version": "2.1.25547.20250602",
+    "LicenseType": "file",
+    "License": "LICENSE"
+  },
+  {
+    "Package": "Avalonia.BuildServices",
+    "Version": "11.3.2",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "Avalonia.Controls.DataGrid",
+    "Version": "11.3.13",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "Avalonia.Desktop",
+    "Version": "11.3.21",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "Avalonia.FreeDesktop",
+    "Version": "11.3.21",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "Avalonia.Native",
+    "Version": "11.3.21",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "Avalonia.Remote.Protocol",
+    "Version": "11.3.21",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "Avalonia.Skia",
+    "Version": "11.3.21",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "Avalonia.Themes.Fluent",
+    "Version": "11.3.21",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "Avalonia.Win32",
+    "Version": "11.3.21",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "Avalonia.X11",
+    "Version": "11.3.21",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "HarfBuzzSharp",
+    "Version": "8.3.1.1",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "HarfBuzzSharp.NativeAssets.Linux",
+    "Version": "8.3.1.1",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "HarfBuzzSharp.NativeAssets.macOS",
+    "Version": "8.3.1.1",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "HarfBuzzSharp.NativeAssets.WebAssembly",
+    "Version": "8.3.1.1",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "HarfBuzzSharp.NativeAssets.Win32",
+    "Version": "8.3.1.1",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "MicroCom.Runtime",
+    "Version": "0.11.0",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "SkiaSharp",
+    "Version": "2.88.9",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "SkiaSharp.NativeAssets.Linux",
+    "Version": "2.88.9",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "SkiaSharp.NativeAssets.macOS",
+    "Version": "2.88.9",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "SkiaSharp.NativeAssets.WebAssembly",
+    "Version": "2.88.9",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "SkiaSharp.NativeAssets.Win32",
+    "Version": "2.88.9",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "System.IO.Pipelines",
+    "Version": "8.0.0",
+    "LicenseType": "expression",
+    "License": "MIT"
+  },
+  {
+    "Package": "Tmds.DBus.Protocol",
+    "Version": "0.21.3",
+    "LicenseType": "expression",
+    "License": "MIT"
+  }
+]

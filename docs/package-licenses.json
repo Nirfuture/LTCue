@@ -1,0 +1,170 @@
+[
+  {
+    "Package": "Avalonia",
+    "Version": "11.3.21",
+    "License": "MIT",
+    "Copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+    "Project": "https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link"
+  },
+  {
+    "Package": "Avalonia.Angle.Windows.Natives",
+    "Version": "2.1.25547.20250602",
+    "License": "LICENSE",
+    "Copyright": "Copyright 2013-2025 © The AvaloniaUI Project",
+    "Project": "https://avaloniaui.net/"
+  },
+  {
+    "Package": "Avalonia.BuildServices",
+    "Version": "11.3.2",
+    "License": "MIT",
+    "Copyright": "Copyright 2023-2025 © The AvaloniaUI Project",
+    "Project": "https://avaloniaui.net/"
+  },
+  {
+    "Package": "Avalonia.Controls.DataGrid",
+    "Version": "11.3.13",
+    "License": "MIT",
+    "Copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+    "Project": "https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link"
+  },
+  {
+    "Package": "Avalonia.Desktop",
+    "Version": "11.3.21",
+    "License": "MIT",
+    "Copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+    "Project": "https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link"
+  },
+  {
+    "Package": "Avalonia.FreeDesktop",
+    "Version": "11.3.21",
+    "License": "MIT",
+    "Copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+    "Project": "https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link"
+  },
+  {
+    "Package": "Avalonia.Native",
+    "Version": "11.3.21",
+    "License": "MIT",
+    "Copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+    "Project": "https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link"
+  },
+  {
+    "Package": "Avalonia.Remote.Protocol",
+    "Version": "11.3.21",
+    "License": "MIT",
+    "Copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+    "Project": "https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link"
+  },
+  {
+    "Package": "Avalonia.Skia",
+    "Version": "11.3.21",
+    "License": "MIT",
+    "Copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+    "Project": "https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link"
+  },
+  {
+    "Package": "Avalonia.Themes.Fluent",
+    "Version": "11.3.21",
+    "License": "MIT",
+    "Copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+    "Project": "https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link"
+  },
+  {
+    "Package": "Avalonia.Win32",
+    "Version": "11.3.21",
+    "License": "MIT",
+    "Copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+    "Project": "https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link"
+  },
+  {
+    "Package": "Avalonia.X11",
+    "Version": "11.3.21",
+    "License": "MIT",
+    "Copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+    "Project": "https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link"
+  },
+  {
+    "Package": "HarfBuzzSharp",
+    "Version": "8.3.1.1",
+    "License": "MIT",
+    "Copyright": "© Microsoft Corporation. All rights reserved.",
+    "Project": "https://go.microsoft.com/fwlink/?linkid=868515"
+  },
+  {
+    "Package": "HarfBuzzSharp.NativeAssets.Linux",
+    "Version": "8.3.1.1",
+    "License": "MIT",
+    "Copyright": "© Microsoft Corporation. All rights reserved.",
+    "Project": "https://go.microsoft.com/fwlink/?linkid=868515"
+  },
+  {
+    "Package": "HarfBuzzSharp.NativeAssets.macOS",
+    "Version": "8.3.1.1",
+    "License": "MIT",
+    "Copyright": "© Microsoft Corporation. All rights reserved.",
+    "Project": "https://go.microsoft.com/fwlink/?linkid=868515"
+  },
+  {
+    "Package": "HarfBuzzSharp.NativeAssets.WebAssembly",
+    "Version": "8.3.1.1",
+    "License": "MIT",
+    "Copyright": "© Microsoft Corporation. All rights reserved.",
+    "Project": "https://go.microsoft.com/fwlink/?linkid=868515"
+  },
+  {
+    "Package": "HarfBuzzSharp.NativeAssets.Win32",
+    "Version": "8.3.1.1",
+    "License": "MIT",
+    "Copyright": "© Microsoft Corporation. All rights reserved.",
+    "Project": "https://go.microsoft.com/fwlink/?linkid=868515"
+  },
+  {
+    "Package": "MicroCom.Runtime",
+    "Version": "0.11.0",
+    "License": "MIT",
+    "Copyright": "Copyright 2021 © Nikita Tsukanov",
+    "Project": ""
+  },
+  {
+    "Package": "SkiaSharp",
+    "Version": "2.88.9",
+    "License": "MIT",
+    "Copyright": "© Microsoft Corporation. All rights reserved.",
+    "Project": "https://go.microsoft.com/fwlink/?linkid=868515"
+  },
+  {
+    "Package": "SkiaSharp.NativeAssets.Linux",
+    "Version": "2.88.9",
+    "License": "MIT",
+    "Copyright": "© Microsoft Corporation. All rights reserved.",
+    "Project": "https://go.microsoft.com/fwlink/?linkid=868515"
+  },
+  {
+    "Package": "SkiaSharp.NativeAssets.macOS",
+    "Version": "2.88.9",
+    "License": "MIT",
+    "Copyright": "© Microsoft Corporation. All rights reserved.",
+    "Project": "https://go.microsoft.com/fwlink/?linkid=868515"
+  },
+  {
+    "Package": "SkiaSharp.NativeAssets.WebAssembly",
+    "Version": "2.88.9",
+    "License": "MIT",
+    "Copyright": "© Microsoft Corporation. All rights reserved.",
+    "Project": "https://go.microsoft.com/fwlink/?linkid=868515"
+  },
+  {
+    "Package": "SkiaSharp.NativeAssets.Win32",
+    "Version": "2.88.9",
+    "License": "MIT",
+    "Copyright": "© Microsoft Corporation. All rights reserved.",
+    "Project": "https://go.microsoft.com/fwlink/?linkid=868515"
+  },
+  {
+    "Package": "Tmds.DBus.Protocol",
+    "Version": "0.21.3",
+    "License": "MIT",
+    "Copyright": "Tom Deseyn",
+    "Project": ""
+  }
+]
