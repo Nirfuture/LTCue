@@ -8,9 +8,8 @@ MP4/H.264、MOV/HAP・HAP Qに対応しています。
 
 ## ダウンロード
 
-**Windows版 ZIP · 0.1.0-preview.11（公開準備中）**
+[Windows版 ZIP · 0.1.0-preview.11](https://github.com/Nirfuture/LTCue/releases/download/v0.1.0-preview.11/LTCue-0.1.0-preview.11-win-x64.zip)
 
-<!-- 新リポジトリでの公開後、実行用ZIPへの直リンクを設定する。 -->
 
 Windows 11 x64対応。現在はプレビュー版です。
 

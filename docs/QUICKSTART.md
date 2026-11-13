@@ -29,9 +29,8 @@ ffprobe -version
 
 ## 起動
 
-**LTCue 0.1.0-preview.11（Windows x64）をダウンロード（公開準備中）**
+[LTCue 0.1.0-preview.11（Windows x64）をダウンロード](https://github.com/Nirfuture/LTCue/releases/download/v0.1.0-preview.11/LTCue-0.1.0-preview.11-win-x64.zip)
 
-<!-- 新リポジトリでの公開後、実行用ZIPへの直リンクを設定する。 -->
 
 ZIPをすべて展開し、直下の`LTCue.exe`を起動します。
 
