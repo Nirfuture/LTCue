@@ -14,7 +14,19 @@
   </ControlTheme>
   <local:CueDurationConverter x:Key="CueDuration"/>
   <DataTemplate x:Key="VideoColumnHeader"><Grid ColumnDefinitions="*,6"><TextBlock Text="動画" VerticalAlignment="Center"/><Border Grid.Column="1" Classes="cue-column-resizer" Background="Transparent" Cursor="SizeWestEast" Margin="0,-8,-6,-8" PointerPressed="ColumnResizePressed" PointerMoved="ColumnResizeMoved" PointerReleased="ColumnResizeReleased" PointerCaptureLost="ColumnResizeCaptureLost" ToolTip.Tip="動画とステータスの幅を調整"/></Grid></DataTemplate>
-  <DataTemplate x:Key="TimecodeColumnHeader"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="開始TC" HorizontalAlignment="Center" VerticalAlignment="Center"/><Button Grid.Column="1" Content="⋯" Padding="6,0" MinWidth="26" MinHeight="26" AttachedToVisualTree="TimecodeMenuAttached" Click="TimecodeMenuClick" AutomationProperties.Name="開始TCメニュー"/></Grid></DataTemplate>
+  <DataTemplate x:Key="TimecodeColumnHeader">
+   <Grid ColumnDefinitions="*,Auto">
+    <TextBlock Text="開始TC" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <Button Grid.Column="1" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="6,0" MinWidth="26" MinHeight="26"
+            AttachedToVisualTree="TimecodeMenuAttached" Click="TimecodeMenuClick" AutomationProperties.Name="開始TCメニュー">
+     <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <Ellipse Width="2" Height="2" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+      <Ellipse Width="2" Height="2" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+      <Ellipse Width="2" Height="2" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+     </StackPanel>
+    </Button>
+   </Grid>
+  </DataTemplate>
   <DataTemplate x:Key="CenteredHeader"><TextBlock Text="{Binding}" HorizontalAlignment="Center" VerticalAlignment="Center"/></DataTemplate>
   <!-- Sorting is disabled; reserve no space for an unused sort icon. -->
   <x:Double x:Key="DataGridSortIconMinWidth">0</x:Double>
@@ -74,7 +86,8 @@
       <Button x:Name="AddCueButton" Content="キュー追加" Click="AddClick"/><Button x:Name="DeleteCueButton" Content="削除" Click="DeleteClick"/><Button x:Name="CloneCueButton" Content="複製" Click="CloneClick"/><Button x:Name="SaveProgramButton" ToolTip.ShowOnDisabled="True" Content="保存" Click="SaveClick"/><Button x:Name="LoadProgramButton" Content="読込" Click="LoadClick"/>
      </StackPanel>
      <Grid x:Name="CueListViewport" Grid.Row="1" ClipToBounds="True">
-     <DataGrid x:Name="CueGrid" CellTheme="{StaticResource QuietCueCell}" AutoGenerateColumns="False" CanUserResizeColumns="False" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Extended" DragDrop.AllowDrop="True" GridLinesVisibility="Horizontal" RowHeight="48" HeadersVisibility="Column" HorizontalScrollBarVisibility="Auto" Background="Transparent">
+     <!-- Keep fractional column widths aligned so adjacent headers cannot cover the 1px separators. -->
+     <DataGrid x:Name="CueGrid" UseLayoutRounding="False" CellTheme="{StaticResource QuietCueCell}" AutoGenerateColumns="False" CanUserResizeColumns="False" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Extended" DragDrop.AllowDrop="True" GridLinesVisibility="Horizontal" RowHeight="48" HeadersVisibility="Column" HorizontalScrollBarVisibility="Auto" Background="Transparent">
       <DataGrid.Columns>
        <DataGridTemplateColumn Width="42"><DataGridTemplateColumn.CellTemplate><DataTemplate><Border Classes="cue-drag-handle" AttachedToVisualTree="CueHandleAttached" Background="Transparent" MinHeight="40" Cursor="SizeAll" PointerPressed="HandlePressed" ToolTip.Tip="並べ替え"><local:LucideIcon Kind="grip-vertical" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False"/></Border></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
        <DataGridTemplateColumn Header="有効" HeaderTemplate="{StaticResource CenteredHeader}" IsReadOnly="True" Width="56"><DataGridTemplateColumn.CellTemplate><DataTemplate x:DataType="core:CueRow"><CheckBox Classes="cue-enabled" IsChecked="{Binding Enabled,Mode=OneWay}" Click="CueEnabledClick" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="32" MinHeight="32" AutomationProperties.Name="有効"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
