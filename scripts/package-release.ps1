@@ -70,7 +70,7 @@ try {
  foreach($name in @('LICENSES')){$destination=Join-Path $app $name;New-Item -ItemType Directory -Force $destination | Out-Null;Get-ChildItem -LiteralPath (Join-Path $source $name) -Force | ForEach-Object {Copy-Item -LiteralPath $_.FullName -Destination $destination -Recurse -Force}}
  # User documentation is an explicit allowlist. Development history remains in source.zip.
  Copy-Item -LiteralPath (Join-Path $source 'docs/DISTRIBUTION_README.md') -Destination (Join-Path $app 'README.md')
- $distributionDocs=@('QUICKSTART.md','USER_GUIDE.md','COMPATIBILITY.md','TROUBLESHOOTING.md','images/quickstart-display.png','images/quickstart-input.png','images/quickstart-output-start.png','images/quickstart-queue.png','images/reference-cover.png','asset-licenses.json','package-licenses.json','dependencies.json',('releases/'+$Version+'.md'))
+ $distributionDocs=@('QUICKSTART.md','USER_GUIDE.md','COMPATIBILITY.md','TROUBLESHOOTING.md','images/quickstart-display.png','images/quickstart-input.png','images/quickstart-output-start.png','images/quickstart-queue.png','images/reference-cover.png','images/reference-playback-order.png','images/reference-playback-order-error.png','asset-licenses.json','package-licenses.json','dependencies.json',('releases/'+$Version+'.md'))
  foreach($relative in $distributionDocs){
   $destination=Join-Path $app ('docs/'+$relative)
   New-Item -ItemType Directory -Force (Split-Path $destination -Parent) | Out-Null
