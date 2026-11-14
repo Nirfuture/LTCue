@@ -1,6 +1,6 @@
 #requires -Version 7.2
 [CmdletBinding()]
-param([string]$DotnetPath='dotnet',[string]$ExecutablePath,[string]$SyncRecoveryAssemblyPath,[string]$HapPreparationAssemblyPath,[string]$JumpRecoveryAssemblyPath,[string]$ResultPath,[string]$FixturesPath,[string]$AudioFixturesPath,[switch]$SkipBuild)
+param([string]$DotnetPath='dotnet',[string]$ExecutablePath,[string]$SyncRecoveryAssemblyPath,[string]$HapPreparationAssemblyPath,[string]$JumpRecoveryAssemblyPath,[string]$TimecodeEditingAssemblyPath,[string]$ResultPath,[string]$FixturesPath,[string]$AudioFixturesPath,[switch]$SkipBuild)
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'verification-common.ps1')
@@ -17,7 +17,7 @@ try{
   if($LASTEXITCODE -ne 0){throw 'Verification build failed.'}
   $ExecutablePath=Join-Path $ResultPath 'app/LTCue.exe'
   Push-Location $repo
-  try{& $DotnetPath build tests/SyncRecovery/SyncRecovery.csproj -c Release;if($LASTEXITCODE -ne 0){throw 'Sync recovery build failed.'};& $DotnetPath build tests/HapPreparation/HapPreparation.csproj -c Release;if($LASTEXITCODE -ne 0){throw 'HAP preparation build failed.'};& $DotnetPath build tests/JumpRecovery/JumpRecovery.csproj -c Release;if($LASTEXITCODE -ne 0){throw 'Jump recovery build failed.'}}finally{Pop-Location}
+  try{& $DotnetPath build tests/SyncRecovery/SyncRecovery.csproj -c Release;if($LASTEXITCODE -ne 0){throw 'Sync recovery build failed.'};& $DotnetPath build tests/HapPreparation/HapPreparation.csproj -c Release;if($LASTEXITCODE -ne 0){throw 'HAP preparation build failed.'};& $DotnetPath build tests/JumpRecovery/JumpRecovery.csproj -c Release;if($LASTEXITCODE -ne 0){throw 'Jump recovery build failed.'};& $DotnetPath build tests/TimecodeEditing/TimecodeEditing.csproj -c Release;if($LASTEXITCODE -ne 0){throw 'Timecode editing build failed.'}}finally{Pop-Location}
  }
  if(-not $ExecutablePath){$ExecutablePath=Join-Path $repo 'artifacts/verification/LTCue.exe'}
  $ExecutablePath=(Resolve-Path -LiteralPath $ExecutablePath).Path
@@ -37,12 +37,14 @@ try{
  $HapPreparationAssemblyPath=(Resolve-Path -LiteralPath $HapPreparationAssemblyPath).Path
  if(-not $JumpRecoveryAssemblyPath){$JumpRecoveryAssemblyPath=Join-Path $repo 'tests/JumpRecovery/bin/Release/net10.0/JumpRecovery.dll'}
  $JumpRecoveryAssemblyPath=(Resolve-Path -LiteralPath $JumpRecoveryAssemblyPath).Path
+ if(-not $TimecodeEditingAssemblyPath){$TimecodeEditingAssemblyPath=Join-Path $repo 'tests/TimecodeEditing/bin/Release/net10.0/TimecodeEditing.dll'}
+ $TimecodeEditingAssemblyPath=(Resolve-Path -LiteralPath $TimecodeEditingAssemblyPath).Path
  $dotnet=(Get-Command $DotnetPath -CommandType Application).Source
  if([bool]$FixturesPath -ne [bool]$AudioFixturesPath){throw 'Specify both fixture paths, or omit both to generate them.'}
  if(-not $FixturesPath){$FixturesPath=Join-Path $ResultPath 'fixtures';& (Join-Path $PSScriptRoot 'new-test-fixtures.ps1') -Path $FixturesPath;$AudioFixturesPath=$FixturesPath}
  $required=@(@($FixturesPath,'h264-aac.mp4'),@($FixturesPath,'hap-pcm.mov'),@($FixturesPath,'hap-q-silent.mov'),@($FixturesPath,'h264-mp3.mp4'),@($FixturesPath,'hap-sync-30s.mov'),@($AudioFixturesPath,'late-pcm.mov'),@($AudioFixturesPath,'early-pcm.mov'),@($AudioFixturesPath,'nonzero-aac.mp4'))
  $hashes=@(foreach($pair in $required){$file=Join-Path $pair[0] $pair[1];if(-not(Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -eq 0){throw "Missing/empty fixture: $file"};Get-FileHash -LiteralPath $file -Algorithm SHA256})
- $manifest=[ordered]@{CreatedUtc=[DateTime]::UtcNow.ToString('o');BuildSkipped=[bool]$SkipBuild;Executable=$ExecutablePath;CatalogVersion=$catalog.Version;Files=@(Get-FileHash -LiteralPath $assembly,(Join-Path $app 'PlayerNative.dll'),(Join-Path $app 'AudioNative.dll'),$SyncRecoveryAssemblyPath,$HapPreparationAssemblyPath,$JumpRecoveryAssemblyPath -Algorithm SHA256);Fixtures=$hashes;Excluded=@($catalog.Suites | Where-Object Mode -ne Auto);PhysicalValidation='Not performed by this automatic runner.'}
+ $manifest=[ordered]@{CreatedUtc=[DateTime]::UtcNow.ToString('o');BuildSkipped=[bool]$SkipBuild;Executable=$ExecutablePath;CatalogVersion=$catalog.Version;Files=@(Get-FileHash -LiteralPath $assembly,(Join-Path $app 'PlayerNative.dll'),(Join-Path $app 'AudioNative.dll'),$SyncRecoveryAssemblyPath,$HapPreparationAssemblyPath,$JumpRecoveryAssemblyPath,$TimecodeEditingAssemblyPath -Algorithm SHA256);Fixtures=$hashes;Excluded=@($catalog.Suites | Where-Object Mode -ne Auto);PhysicalValidation='Not performed by this automatic runner.'}
  $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $ResultPath 'manifest.json') -Encoding utf8
  $folder=Join-Path $ResultPath 'sync-calculation';New-Item -ItemType Directory -Path $folder | Out-Null
  $watch=[Diagnostics.Stopwatch]::StartNew()
@@ -62,6 +64,12 @@ try{
  $items=@(Get-Content -LiteralPath (Join-Path $folder 'results.json') -Raw | ConvertFrom-Json)
  $ok=$exit -eq 0 -and $items.Count -eq 10 -and @($items | Where-Object status -ne 'PASS').Count -eq 0
  $summary.Add([ordered]@{Suite='jump-recovery-calculation';Status=$(if($ok){'PASS'}else{'FAIL'});Count=$items.Count;ExitCode=$exit;Seconds=$watch.Elapsed.TotalSeconds})
+ $folder=Join-Path $ResultPath 'timecode-editing-calculation';New-Item -ItemType Directory -Path $folder | Out-Null
+ $watch=[Diagnostics.Stopwatch]::StartNew()
+ $exit=Invoke-VerificationProcess $dotnet @($TimecodeEditingAssemblyPath,(Join-Path $folder 'results.json')) $folder 90
+ $items=@(Get-Content -LiteralPath (Join-Path $folder 'results.json') -Raw | ConvertFrom-Json)
+ $ok=$exit -eq 0 -and $items.Count -eq 27 -and @($items | Where-Object status -ne 'PASS').Count -eq 0
+ $summary.Add([ordered]@{Suite='timecode-editing-calculation';Status=$(if($ok){'PASS'}else{'FAIL'});Count=$items.Count;ExitCode=$exit;Seconds=$watch.Elapsed.TotalSeconds})
  foreach($suite in $catalog.Suites | Where-Object Mode -eq Auto){
   if($suite.Name -notmatch '^[a-z0-9-]+$'){throw 'Invalid suite name.'}
   $folder=Join-Path $ResultPath $suite.Name;New-Item -ItemType Directory -Path $folder | Out-Null

@@ -352,6 +352,7 @@
       "Kind": "Status",
       "TimeoutSeconds": 120,
       "Mode": "Auto"
-    }
+    },
+    {"Name":"timecode-editing","Count":10,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"}
   ]
 }

@@ -16,6 +16,6 @@
  <ItemGroup Condition="'$(EnableVerification)' == 'true'"><EmbeddedResource Include="../../scripts/verification-suites.json" LogicalName="LtcPlayer.VerificationCatalog"/></ItemGroup>
  <PropertyGroup Condition="'$(EnableVerification)' == 'true'"><DefineConstants>$(DefineConstants);VERIFICATION</DefineConstants><DebugType>embedded</DebugType></PropertyGroup>
  <ItemGroup Condition="'$(EnableVerification)' != 'true'"><Compile Remove="**/*Verification.cs;Regression/**/*.cs"/></ItemGroup>
-<ItemGroup><Compile Include="../LtcPlayer.App/PlaybackTimeline.cs" Link="Core/PlaybackTimeline.cs"/></ItemGroup><ItemGroup><Compile Include="../LtcPlayer.App/MovHapIndex.cs;../LtcPlayer.App/HapIndexCache.cs;../LtcPlayer.App/MediaPreparationStage.cs" Link="Core/%(Filename)%(Extension)"/></ItemGroup></Project>
+<ItemGroup><Compile Include="../LtcPlayer.App/CueTimecodes.cs" Link="Core/CueTimecodes.cs"/><Compile Include="../LtcPlayer.App/PlaybackTimeline.cs" Link="Core/PlaybackTimeline.cs"/></ItemGroup><ItemGroup><Compile Include="../LtcPlayer.App/MovHapIndex.cs;../LtcPlayer.App/HapIndexCache.cs;../LtcPlayer.App/MediaPreparationStage.cs" Link="Core/%(Filename)%(Extension)"/></ItemGroup></Project>
 
 

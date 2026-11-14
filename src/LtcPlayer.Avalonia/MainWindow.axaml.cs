@@ -83,6 +83,7 @@ public partial class MainWindow : Window
    await Dispatcher.UIThread.InvokeAsync(FitInitialContentHeight,DispatcherPriority.Loaded);
    presentationReady=true;StartMaterialMonitor();
 #if VERIFICATION
+   if(Program.Option("--verify-timecode-editing") is {} timecodesFolder)await TimecodeEditingVerification.RunAsync(this,timecodesFolder);
    if(Program.Option("--verify-display-columns") is {} columnsFolder)await DisplayColumnsVerification.RunAsync(this,columnsFolder);
    if(Program.Option("--verify-ui-copy") is {} copyFolder)await UiCopyVerification.RunAsync(this,copyFolder);
    if(Program.Option("--verify-cover-height") is {} coverHeightFolder)await CoverHeightVerification.RunAsync(this,coverHeightFolder);
@@ -135,7 +136,7 @@ public partial class MainWindow : Window
    if(Program.Option("--verify-delivery-operations") is {} deliveryFolder)await DeliveryOperationsVerification.RunAsync(this,deliveryFolder);
    if(Program.Option("--verify-default-show") is {} defaultFolder)await DefaultTestShow.VerifyAsync(this,defaultFolder);
 #endif
-  }catch(Exception e){StatusMessage(e.Message);var folder=Program.Option("--verify-cover-height")??Program.Option("--verify-save-layout")??Program.Option("--verify-multi-selection")??Program.Option("--verify-ltc-settings")??Program.Option("--verify-cover-changes")??Program.Option("--verify-hap-preparation")??Program.Option("--verify-lost-editing")??Program.Option("--verify-cue-editing")??Program.Option("--verify-operation-access")??Program.Option("--verify-material-recovery")??Program.Option("--verify-startup-measure")??Program.Option("--verify-preview-clip")??Program.Option("--verify-timing-status")??Program.Option("--verify-rendering-health")??Program.Option("--verify-resize-anchor")??Program.Option("--verify-audio-start")??Program.Option("--verify-settings-apply")??Program.Option("--verify-input-level")??Program.Option("--verify-ui-corrections")??Program.Option("--verify-ui-design")??Program.Option("--verify-coordinator")??Program.Option("--verify-preview-ui")??Program.Option("--verify-audio-ui")??Program.Option("--verify-audio-connected")??Program.Option("--verify-audio-service")??Program.Option("--verify-audio-decode")??Program.Option("--verify-audio-foundation")??Program.Option("--verify-playback-integration")??Program.Option("--verify-redesign-baseline")??Program.Option("--verify-shared-canvas")??Program.Option("--verify-phase5")??Program.Option("--verify-ui-update")??Program.Option("--verify-monitor")??Program.Option("--verify-preview-recovery")??Program.Option("--verify-delivery-operations")??Program.Option("--verify-default-show");if(folder!=null){Directory.CreateDirectory(folder);File.WriteAllText(Path.Combine(folder,"fatal.txt"),e.ToString());Shutdown(1);}}
+  }catch(Exception e){StatusMessage(e.Message);var folder=Program.Option("--verify-timecode-editing")??Program.Option("--verify-cover-height")??Program.Option("--verify-save-layout")??Program.Option("--verify-multi-selection")??Program.Option("--verify-ltc-settings")??Program.Option("--verify-cover-changes")??Program.Option("--verify-hap-preparation")??Program.Option("--verify-lost-editing")??Program.Option("--verify-cue-editing")??Program.Option("--verify-operation-access")??Program.Option("--verify-material-recovery")??Program.Option("--verify-startup-measure")??Program.Option("--verify-preview-clip")??Program.Option("--verify-timing-status")??Program.Option("--verify-rendering-health")??Program.Option("--verify-resize-anchor")??Program.Option("--verify-audio-start")??Program.Option("--verify-settings-apply")??Program.Option("--verify-input-level")??Program.Option("--verify-ui-corrections")??Program.Option("--verify-ui-design")??Program.Option("--verify-coordinator")??Program.Option("--verify-preview-ui")??Program.Option("--verify-audio-ui")??Program.Option("--verify-audio-connected")??Program.Option("--verify-audio-service")??Program.Option("--verify-audio-decode")??Program.Option("--verify-audio-foundation")??Program.Option("--verify-playback-integration")??Program.Option("--verify-redesign-baseline")??Program.Option("--verify-shared-canvas")??Program.Option("--verify-phase5")??Program.Option("--verify-ui-update")??Program.Option("--verify-monitor")??Program.Option("--verify-preview-recovery")??Program.Option("--verify-delivery-operations")??Program.Option("--verify-default-show");if(folder!=null){Directory.CreateDirectory(folder);File.WriteAllText(Path.Combine(folder,"fatal.txt"),e.ToString());Shutdown(1);}}
  }
  internal static void Shutdown(int code){if(Application.Current?.ApplicationLifetime is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime d)d.Shutdown(code);}
  async Task Safe(Func<Task> action){try{await action();}catch(OperationCanceledException){}catch(Exception e){StatusMessage(e.Message);}}
@@ -189,7 +190,7 @@ public partial class MainWindow : Window
  async void AddClick(object? s,RoutedEventArgs e)
  {
   if(!CanEditProgram)return;var files=await StorageProvider.OpenFilePickerAsync(new(){Title="動画を登録",AllowMultiple=true,FileTypeFilter=[new("対応動画"){Patterns=["*.mp4","*.mov"]}]});
-  if(files.Count>0)await Edit(()=>Editor.ImportAsync(files.Select(f=>f.TryGetLocalPath()??throw new IOException("ローカルファイルが必要です")),new CueRow().StartTimecode));
+  if(files.Count>0)await Edit(()=>Editor.ImportAsync(files.Select(f=>f.TryGetLocalPath()??throw new IOException("ローカルファイルが必要です")),new CueRow().StartTimecode,settings.CuePlacement));
  }
  async void DeleteClick(object? s,RoutedEventArgs e){var ids=SelectedCueIds();if(ids.Length>0)await Edit(()=>DeleteCuesAsync(ids));}
  internal Task DeleteCueAsync(CueRow row)=>DeleteCuesAsync([row.CueId]);
@@ -223,6 +224,6 @@ public partial class MainWindow : Window
  async void Drop(object? s,DragEventArgs e)
  {
   if(!CanEditProgram)return;e.Handled=true;
-  if(e.DataTransfer.Formats.Contains(DataFormat.File)&&e.DataTransfer.TryGetFiles() is {} files){await Edit(()=>Editor.ImportAsync(files.Select(f=>f.TryGetLocalPath()).OfType<string>(),new CueRow().StartTimecode));return;}
+  if(e.DataTransfer.Formats.Contains(DataFormat.File)&&e.DataTransfer.TryGetFiles() is {} files){await Edit(()=>Editor.ImportAsync(files.Select(f=>f.TryGetLocalPath()).OfType<string>(),new CueRow().StartTimecode,settings.CuePlacement));return;}
  }
 }

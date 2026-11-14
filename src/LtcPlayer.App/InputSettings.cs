@@ -13,17 +13,18 @@ public static class OutputPresentation
 }
 public record InputSettings(string DeviceId="",string DeviceName="",int Channel=0,string Rate="25",string Start="00:00:00:00",int Offset=0,double Freewheel=0.1,double Resync=2,OutputPresentationMode OutputMode=OutputPresentationMode.Standard,string CoverPath="",double FadeSeconds=1,string AudioDeviceId="",double AudioVolume=.5)
 {
+    public CuePlacementPreferences CuePlacement { get; init; } = new();
     public static string PathName=>Path.Combine(AppContext.BaseDirectory,"phase2-settings.json");
     public static InputSettings Load(string? path=null)
     {
         path??=PathName;
         if(!File.Exists(path)) return new();
         var settings=JsonSerializer.Deserialize<InputSettings>(File.ReadAllText(path))??new();
-        if(!double.IsFinite(settings.AudioVolume)||settings.AudioVolume<0||settings.AudioVolume>1)throw new InvalidDataException("音量は0～1");OutputPresentation.Validate(settings.OutputMode);if(!double.IsFinite(settings.FadeSeconds)||settings.FadeSeconds<0||settings.FadeSeconds>60)throw new InvalidDataException("フェードは0～60秒");return settings;
+        if(!double.IsFinite(settings.AudioVolume)||settings.AudioVolume<0||settings.AudioVolume>1)throw new InvalidDataException("音量は0～1");OutputPresentation.Validate(settings.OutputMode);if(!double.IsFinite(settings.FadeSeconds)||settings.FadeSeconds<0||settings.FadeSeconds>60)throw new InvalidDataException("フェードは0～60秒");if(settings.CuePlacement==null)throw new InvalidDataException("追加時の開始TC設定が不正です");settings.CuePlacement.Validate();return settings;
     }
     public void Save(string? path=null)
     {
-        OutputPresentation.Validate(OutputMode);
+        OutputPresentation.Validate(OutputMode);CuePlacement.Validate();
         path??=PathName;
         var temp=path+".tmp"; File.WriteAllText(temp,JsonSerializer.Serialize(this,new JsonSerializerOptions{WriteIndented=true}));
         File.Move(temp,path,true);

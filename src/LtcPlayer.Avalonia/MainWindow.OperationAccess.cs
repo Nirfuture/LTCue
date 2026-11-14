@@ -66,7 +66,7 @@ public partial class MainWindow
    "":seek.Reason);
   if(!seek.Allowed&&(scrubbing||keyboardSeeking))CancelScrub();
   foreach(string name in new[]{"AddCueButton","LoadProgramButton"}){Control<Button>(name).IsEnabled=CanEditProgram;ToolTip.SetTip(Control<Button>(name),CanEditProgram?null:ProgramEditAccess.Reason);}
-  UpdateCueSelectionControls();UpdateCueEditingControls();
+  UpdateCueSelectionControls();UpdateCueEditingControls();UpdateTimecodeMenu();
   var save=SaveAccess;Control<Button>("SaveProgramButton").IsEnabled=save.Allowed;
   ToolTip.SetTip(Control<Button>("SaveProgramButton"),save.Allowed?"":save.Reason);
  }

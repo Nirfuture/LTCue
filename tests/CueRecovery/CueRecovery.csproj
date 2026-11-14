@@ -9,4 +9,4 @@
   <Compile Include="../../src/LtcPlayer.Avalonia/Playback/CoverController.cs" Link="CoverController.cs"/>
   <Compile Include="../../src/LtcPlayer.Avalonia/MaterialMonitor.cs" Link="MaterialMonitor.cs"/>
  </ItemGroup>
-</Project>
+<ItemGroup><Compile Include="../../src/LtcPlayer.App/CueTimecodes.cs" Link="Core/CueTimecodes.cs"/></ItemGroup></Project>

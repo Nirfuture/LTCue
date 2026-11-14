@@ -9,10 +9,21 @@ public record TimecodeRate(string Name, int Nominal, double Fps, bool Drop)
         if(h<0 || h>23 || m<0 || m>59 || s<0 || s>59 || f<0 || f>=Nominal || (Drop && m%10!=0 && s==0 && f<2)) throw new InvalidDataException("TC不正");
         return ((h*3600L+m*60+s)*Nominal+f)-(Drop?2*(h*60+m-(h*60+m)/10):0);
     }
-    public double Parse(string value)
+    public long FramesPerDay => 24*3600L*Nominal-(Drop?2592:0);
+    public long ParseFrames(string value)
     {
-        var parts=value.Split(':',';'); if(parts.Length!=4) throw new InvalidDataException("TCはHH:MM:SS:FF");
-        var p=parts.Select(int.Parse).ToArray(); return Frames(p[0],p[1],p[2],p[3])/Fps;
+        var parts=value.Split(':',';');
+        if(parts.Length!=4)throw new InvalidDataException("TCはHH:MM:SS:FF");
+        var p=parts.Select(int.Parse).ToArray();return Frames(p[0],p[1],p[2],p[3]);
+    }
+    public double Parse(string value)=>ParseFrames(value)/Fps;
+    public string FormatFrames(long frames)
+    {
+        if(frames<0||frames>=FramesPerDay)throw new InvalidDataException("開始TCは24時間未満です");
+        long nominal=frames;
+        if(Drop){long blocks=frames/17982,remainder=frames%17982;nominal+=18*blocks+2*Math.Max(0,(remainder-2)/1798);}
+        long whole=nominal/Nominal;
+        return $"{whole/3600:00}:{whole/60%60:00}:{whole%60:00}{(Drop?";":":")}{nominal%Nominal:00}";
     }
     public double FramesToSeconds(int frames)=>frames/Fps;
     public double DaySeconds => ((24*3600L*Nominal)-(Drop?2592:0))/Fps;

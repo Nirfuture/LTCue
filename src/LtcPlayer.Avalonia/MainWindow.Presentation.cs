@@ -39,6 +39,7 @@ public partial class MainWindow
    var current=playback.ReadAudioPlayhead();
    if(current.SessionId!=source.SessionId||current.CueId!=source.CueId||current.Generation!=source.Generation||current.SourceRevision!=source.SourceRevision)return;
    foreach(var row in Editor.Rows.Where(r=>r.FilePath==source.Path&&(r.SourceRevision==source.SourceRevision||source.SourceRevision==0)))row.AudioIssue=error;
+   UpdateProgramSummary();
   });
   playback.MaterialFailed+=failure=>Dispatcher.UIThread.Post(()=>{
    if(closing||failure.SessionId!=playback.SynchronizationSession||!Editor.Rows.Any(r=>r.CueId==failure.Cue.CueId&&r.FilePath==failure.Cue.FilePath&&r.SourceRevision==failure.Cue.SourceRevision))return;
