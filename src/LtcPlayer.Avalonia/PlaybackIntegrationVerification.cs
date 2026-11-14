@@ -18,12 +18,12 @@ public static class PlaybackIntegrationVerification
             var row=new CueRow{FilePath=Program.Option("--media")??Path.Combine(AppContext.BaseDirectory,"TestMedia","HAP_1_1080p_2997_10s.mov")};
             await ShowProgramService.RefreshAsync(row,CancellationToken.None);w.Editor.Add(row);
             var grid=w.FindControl<DataGrid>("CueGrid")!;grid.SelectedItem=row;
-            await Until(()=>w.Preview.Snapshot.State==PreviewState.Ready);
+            await w.Preview.LoadAsync(row.FilePath);
             var canvas=w.Surface.Canvas;var session=canvas.SessionId;
             await Test("manual output toggle preserves canvas, decoder and clock",async()=>{
                 await w.Preview.PlayAsync();await Until(()=>w.Preview.Snapshot.Position>.25);
                 var decode=w.Preview.PlaybackSessionId;int starts=w.Preview.DecodeStarts;double before=w.Preview.Snapshot.Position;
-                await w.ArmAsync();Check(canvas.OutputAttached&&w.IsArmed,"not attached");Check(w.Surface.Canvas.SessionId==session&&w.Preview.PlaybackSessionId==decode&&w.Preview.DecodeStarts==starts,"output restarted source");
+                await w.ArmAsync();Check(canvas.OutputAttached&&w.IsOutputActive,"not attached");Check(w.Surface.Canvas.SessionId==session&&w.Preview.PlaybackSessionId==decode&&w.Preview.DecodeStarts==starts,"output restarted source");
                 await Task.Delay(150);await w.DisarmAsync();Check(!canvas.OutputAttached&&w.Preview.Snapshot.State==PreviewState.Playing,"detach stopped source");
                 Check(w.Preview.Snapshot.Position>=before&&w.Preview.PlaybackSessionId==decode,"clock reset");
             });
@@ -35,11 +35,11 @@ public static class PlaybackIntegrationVerification
             await Test("failed output creation releases lock and keeps preview",async()=>{
                 var image=canvas.Readback();w.BeforeOutputAttachForTest=()=>throw new IOException("Synthetic attach failure");bool rejected=false;
                 try{await w.ArmAsync();}catch(IOException){rejected=true;}finally{w.BeforeOutputAttachForTest=null;}
-                Check(rejected&&!w.IsArmed&&!w.Editor.Locked&&!canvas.OutputAttached,"failed attach left locked");Check(canvas.Readback().AsSpan().SequenceEqual(image),"failed attach changed image");
+                Check(rejected&&!w.IsOutputActive&&!w.Editor.Locked&&!canvas.OutputAttached,"failed attach left locked");Check(canvas.Readback().AsSpan().SequenceEqual(image),"failed attach changed image");
             });
-            await Test("manual stop holds image and explicit play restarts at zero",async()=>{
-                await w.Preview.SeekAsync(2);var image=canvas.Readback();await w.Preview.StopAsync();await Task.Delay(100);
-                Check(canvas.Readback().AsSpan().SequenceEqual(image),"stop cleared image");await w.Preview.PlayAsync();Check(w.Preview.Snapshot.Position<.5,"stop did not restart");await w.Preview.PauseAsync();
+            await Test("manual stop returns first frame and explicit play restarts at zero",async()=>{
+                await w.Preview.SeekAsync(0);var first=canvas.Readback();await w.Preview.SeekAsync(2);await w.Preview.StopAsync();await Task.Delay(100);
+                Check(w.Preview.Snapshot.Position==0&&canvas.Readback().AsSpan().SequenceEqual(first),"stop did not return first frame");await w.Preview.PlayAsync();Check(w.Preview.Snapshot.Position<.5,"stop did not restart");await w.Preview.PauseAsync();
             });
             await Test("cover fade continues through output attach and detach",async()=>{
                 w.Cover.Set(true,1);await Task.Delay(220);double amount=w.Cover.Amount();await w.ArmAsync();await Task.Delay(120);await w.DisarmAsync();
@@ -50,7 +50,7 @@ public static class PlaybackIntegrationVerification
             });
             await Test("LTC preempts manual playback without replacing canvas",async()=>{
                 await w.Preview.PlayAsync();Volatile.Write(ref receiving,1);await Until(()=>w.PreviewObservation is {FramePts:>0,State:SyncState.LOCKED});
-                Check(w.Preview.Armed&&PreviewAudio.ActiveStreams==0,"manual source survived LTC");Check(w.Surface.Canvas.SessionId==session,"LTC replaced canvas");
+                Check(w.Preview.IsSyncOwned&&PreviewAudio.ActiveStreams==0,"manual source survived LTC");Check(w.Surface.Canvas.SessionId==session,"LTC replaced canvas");
             });
             await Test("LTC session and input remain alive across output toggles",async()=>{
                 var sync=w.SynchronizationSession;var clock=w.Monitor.Clock;int starts=w.Monitor.Starts;double pts=w.PreviewObservation!.FramePts??0;
@@ -61,8 +61,8 @@ public static class PlaybackIntegrationVerification
             await Test("stop confirmation cancel continues output and LTC",async()=>{
                 await w.ArmAsync();w.ConfirmStopForTest=async _=>{await Task.Delay(130);return false;};
                 var sync=w.SynchronizationSession;double pts=w.PreviewObservation!.FramePts??0;
-                Check(!await w.RequestStopAsync(false)&&w.IsArmed,"cancel stopped output");Check(w.SynchronizationSession==sync,"confirmation reset session");await Until(()=>w.PreviewObservation!.FramePts>pts);
-                w.ConfirmStopForTest=_=>Task.FromResult(true);Check(await w.RequestStopAsync(false)&&!w.IsArmed,"confirmed stop failed");w.ConfirmStopForTest=null;
+                Check(!await w.RequestStopAsync(false)&&w.IsOutputActive,"cancel stopped output");Check(w.SynchronizationSession==sync,"confirmation reset session");await Until(()=>w.PreviewObservation!.FramePts>pts);
+                w.ConfirmStopForTest=_=>Task.FromResult(true);Check(await w.RequestStopAsync(false)&&!w.IsOutputActive,"confirmed stop failed");w.ConfirmStopForTest=null;
             });
             await Test("LTC loss holds; manual row starts in the same canvas; LTC resumes",async()=>{
                 Volatile.Write(ref receiving,0);await Until(()=>w.PreviewObservation?.State==SyncState.LOST);double? held=w.PreviewObservation!.FramePts;await Task.Delay(140);Check(w.PreviewObservation.FramePts==held,"lost advanced");
@@ -72,7 +72,7 @@ public static class PlaybackIntegrationVerification
             Volatile.Write(ref receiving,0);await Until(()=>w.PreviewObservation?.State==SyncState.LOST);await w.StopSyncPreviewAsync();
             await Test("latest load request wins; cancelled load cannot overwrite it",async()=>{
                 string latest=Program.Option("--fixtures") is {} f?Path.Combine(f,"h264-aac.mp4"):row.FilePath;var a=w.Preview.LoadAsync(row.FilePath);var b=w.Preview.LoadAsync(latest);await Task.WhenAll(a,b);Check(w.Preview.LoadedPath==latest,"stale request overwrote latest file");
-                Check(w.Preview.Snapshot.State==PreviewState.Ready&&!w.Preview.IsBusy&&!w.Preview.Armed,"latest request did not commit");
+                Check(w.Preview.Snapshot.State==PreviewState.Ready&&!w.Preview.IsBusy&&!w.Preview.IsSyncOwned,"latest request did not commit");
             });
             await Test("stop cancels the whole load-and-play request",async()=>{
                 await w.Preview.LoadAsync(row.FilePath);await w.Preview.StopAsync();int starts=w.Preview.DecodeStarts;

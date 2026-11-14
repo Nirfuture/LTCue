@@ -42,14 +42,36 @@ static int PresentComposite(Output* o){
   }catch(HRESULT hr){if(o->offscreen){o->externalError=hr;return S_OK;}throw;}
  }catch(HRESULT hr){return hr;}
 }
-extern "C" __declspec(dllexport) int __cdecl output_cover(void* handle,const unsigned char* pixels,int width,int height){
+// Prepared textures are not visible until the allocation-free commit. They can
+// be discarded after a persistence failure without touching the active cover.
+struct PreparedCover {
+ Output* owner;ComPtr<ID3D11Texture2D> image;ComPtr<ID3D11ShaderResourceView> view;
+ int width=0,height=0;bool committed=false;
+};
+extern "C" __declspec(dllexport) int __cdecl output_cover_prepare(void* handle,const unsigned char* pixels,int width,int height,void** prepared){
+ if(!prepared)return E_POINTER;*prepared=nullptr;
  auto o=(Output*)handle;if(!o||width<0||height<0||width>8192||height>8192)return E_INVALIDARG;
+ if((pixels==nullptr)!=(width==0&&height==0))return E_INVALIDARG;
  try{
-  PrepareComposite(o);
-  ComPtr<ID3D11Texture2D> image;ComPtr<ID3D11ShaderResourceView> view;
-  if(pixels&&width>0&&height>0){D3D11_TEXTURE2D_DESC td={};td.Width=width;td.Height=height;td.MipLevels=td.ArraySize=1;td.Format=DXGI_FORMAT_B8G8R8A8_UNORM;td.SampleDesc.Count=1;td.BindFlags=D3D11_BIND_SHADER_RESOURCE;D3D11_SUBRESOURCE_DATA data={pixels,(UINT)width*4,0};Check(o->device->CreateTexture2D(&td,&data,&image));Check(o->device->CreateShaderResourceView(image.Get(),nullptr,&view));}
-  o->coverImage=image;o->coverView=view;o->coverWidth=image?width:0;o->coverHeight=image?height:0;return S_OK;
- }catch(HRESULT hr){return hr;}
+  PrepareComposite(o);auto next=std::make_unique<PreparedCover>();next->owner=o;
+  if(pixels){
+   if(width==0||height==0)return E_INVALIDARG;
+   D3D11_TEXTURE2D_DESC td={};td.Width=width;td.Height=height;td.MipLevels=td.ArraySize=1;td.Format=DXGI_FORMAT_B8G8R8A8_UNORM;td.SampleDesc.Count=1;td.BindFlags=D3D11_BIND_SHADER_RESOURCE;
+   D3D11_SUBRESOURCE_DATA data={pixels,(UINT)width*4,0};Check(o->device->CreateTexture2D(&td,&data,&next->image));Check(o->device->CreateShaderResourceView(next->image.Get(),nullptr,&next->view));
+   next->width=width;next->height=height;
+  }
+  *prepared=next.release();return S_OK;
+ }catch(HRESULT hr){return hr;}catch(const std::bad_alloc&){return E_OUTOFMEMORY;}
+}
+extern "C" __declspec(dllexport) int __cdecl output_cover_commit(void* handle,void* prepared){
+ auto o=(Output*)handle;auto next=(PreparedCover*)prepared;
+ if(!o||!next||next->owner!=o||next->committed)return E_INVALIDARG;
+ o->coverImage=std::move(next->image);o->coverView=std::move(next->view);o->coverWidth=next->width;o->coverHeight=next->height;next->committed=true;return S_OK;
+}
+extern "C" __declspec(dllexport) void __cdecl output_cover_free(void* prepared){delete (PreparedCover*)prepared;}
+extern "C" __declspec(dllexport) int __cdecl output_cover(void* handle,const unsigned char* pixels,int width,int height){
+ void* prepared=nullptr;int result=output_cover_prepare(handle,pixels,width,height,&prepared);if(result<0)return result;
+ result=output_cover_commit(handle,prepared);output_cover_free(prepared);return result;
 }
 extern "C" __declspec(dllexport) int __cdecl output_cover_mix(void* handle,float mix){auto o=(Output*)handle;if(!o||!std::isfinite(mix)||mix<0||mix>1)return E_INVALIDARG;o->coverMix=mix;return S_OK;}
 extern "C" __declspec(dllexport) int __cdecl output_redraw(void* handle){auto o=(Output*)handle;if(!o||(!o->offscreen&&!IsWindow(o->window)))return E_INVALIDARG;return PresentComposite(o);}

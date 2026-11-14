@@ -6,42 +6,57 @@ public record TimecodeRate(string Name, int Nominal, double Fps, bool Drop)
     public override string ToString() => Name;
     public long Frames(int h,int m,int s,int f)
     {
-        if(h<0 || h>23 || m<0 || m>59 || s<0 || s>59 || f<0 || f>=Nominal || (Drop && m%10!=0 && s==0 && f<2)) throw new InvalidDataException("無効なタイムコードです。");
+        if(h<0 || h>23 || m<0 || m>59 || s<0 || s>59 || f<0 || f>=Nominal || (Drop && m%10!=0 && s==0 && f<2)) throw new InvalidDataException("TC不正");
         return ((h*3600L+m*60+s)*Nominal+f)-(Drop?2*(h*60+m-(h*60+m)/10):0);
     }
     public double Parse(string value)
     {
-        var parts=value.Split(':',';'); if(parts.Length!=4) throw new InvalidDataException("TCはHH:MM:SS:FFで入力してください。");
+        var parts=value.Split(':',';'); if(parts.Length!=4) throw new InvalidDataException("TCはHH:MM:SS:FF");
         var p=parts.Select(int.Parse).ToArray(); return Frames(p[0],p[1],p[2],p[3])/Fps;
     }
     public double FramesToSeconds(int frames)=>frames/Fps;
     public double DaySeconds => ((24*3600L*Nominal)-(Drop?2592:0))/Fps;
 }
 public enum SyncState { WAITING, LOCKED, FREEWHEEL, LOST, RESYNC, ERROR }
-public record ClockSnapshot(SyncState State,double Seconds,int Generation,string Label);
+public record ClockSnapshot(SyncState State,double Seconds,int Generation,string Label)
+{
+    // LOCKED/RESYNC/FREEWHEEL share LTC authority; WAITING/LOST allow manual control.
+    // First acquisition and input faults can change authority without a new generation.
+    public bool MatchesPlaybackAuthority(ClockSnapshot other)=>MatchesPlaybackAuthority(other.State,other.Generation);
+    public bool MatchesPlaybackAuthority(SyncState state,int generation)=>Generation==generation&&Authority(State)==Authority(state);
+    static int Authority(SyncState state)=>state is SyncState.LOCKED or SyncState.RESYNC or SyncState.FREEWHEEL?1:state==SyncState.ERROR?2:0;
+}
 public sealed class MasterClock
 {
     private readonly object gate=new(); private readonly TimecodeRate rate;
     private bool received,error; private double anchor,stamp,day; private int generation; private bool resync; private string label="--:--:--:--";
-    public double FreewheelSeconds { get; }
-    public double ResyncFrames { get; }
+    // Configured policy applies on Accept; Read keeps the last received signal's cap.
+    // Extending the setting alone must never revive an already lost signal.
+    double freewheelSeconds,resyncFrames,effectiveFreewheel;
+    public double FreewheelSeconds { get { lock(gate)return freewheelSeconds; } }
+    public double ResyncFrames { get { lock(gate)return resyncFrames; } }
+    public void UpdatePolicy(double freewheel,double resyncFrames)
+    {
+        if(!double.IsFinite(freewheel)||freewheel<0||!double.IsFinite(resyncFrames)||resyncFrames<=0)throw new ArgumentOutOfRangeException();
+        lock(gate){freewheelSeconds=freewheel;this.resyncFrames=resyncFrames;}
+    }
     public MasterClock(TimecodeRate rate,double freewheel=0.1,double resyncFrames=2)
     {
         if(!double.IsFinite(freewheel)||freewheel<0 || !double.IsFinite(resyncFrames)||resyncFrames<=0) throw new ArgumentOutOfRangeException();
-        this.rate=rate; FreewheelSeconds=freewheel; ResyncFrames=resyncFrames;
+        this.rate=rate; UpdatePolicy(freewheel,resyncFrames);effectiveFreewheel=freewheel;
     }
     public void Accept(TcFrame tc,double capturedSeconds)
     {
-        if(tc.Drop!=(rate.Drop?1:0) || tc.Reverse!=0) throw new InvalidDataException("受信LTCのDF/方向が選択モードと一致しません。");
+        if(tc.Drop!=(rate.Drop?1:0) || tc.Reverse!=0) throw new InvalidDataException("LTC形式・再生方向が不一致");
         // The decoded label names the frame start; off_end timestamps its end.
         var seconds=(rate.Frames(tc.Hours,tc.Minutes,tc.Seconds,tc.Frame)+1)/rate.Fps;
         lock(gate)
         {
             if(received && anchor-day>rate.DaySeconds-2 && seconds<2) day+=rate.DaySeconds;
             seconds+=day;
-            bool jump=received && (error || capturedSeconds-stamp>FreewheelSeconds || Math.Abs(seconds-(anchor+capturedSeconds-stamp))>ResyncFrames/rate.Fps);
+            bool jump=received && (error || capturedSeconds-stamp>effectiveFreewheel || Math.Abs(seconds-(anchor+capturedSeconds-stamp))>resyncFrames/rate.Fps);
             if(jump) ++generation;
-            resync=jump; anchor=seconds; stamp=capturedSeconds; received=true; error=false;
+            effectiveFreewheel=freewheelSeconds;resync=jump; anchor=seconds; stamp=capturedSeconds; received=true; error=false;
             label=$"{tc.Hours:00}:{tc.Minutes:00}:{tc.Seconds:00}{(rate.Drop?";":":")}{tc.Frame:00}";
         }
     }
@@ -53,8 +68,8 @@ public sealed class MasterClock
             if(error) return new(SyncState.ERROR,anchor,generation,label);
             if(!received) return new(SyncState.WAITING,0,generation,label);
             double age=Math.Max(0,(now??Timestamp())-stamp);
-            var state=age>FreewheelSeconds?SyncState.LOST:age>2/rate.Fps?SyncState.FREEWHEEL:resync?SyncState.RESYNC:SyncState.LOCKED;
-            return new(state,anchor+Math.Min(age,FreewheelSeconds),generation,label);
+            var state=age>effectiveFreewheel?SyncState.LOST:age>2/rate.Fps?SyncState.FREEWHEEL:resync?SyncState.RESYNC:SyncState.LOCKED;
+            return new(state,anchor+Math.Min(age,effectiveFreewheel),generation,label);
         }
     }
     public static double Timestamp()=>Stopwatch.GetTimestamp()/(double)Stopwatch.Frequency;

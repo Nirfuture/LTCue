@@ -62,7 +62,7 @@ public sealed class PreviewHost : NativeControlHost, ICoverRenderer
     {
         Dispatcher.UIThread.VerifyAccess();
         if(newWidth==width&&newHeight==height)return null;
-        if(canvas?.OutputAttached==true)throw new InvalidOperationException("出力中は描画サイズを変更できません。");
+        if(canvas?.OutputAttached==true)throw new InvalidOperationException("出力中は描画サイズを変更できません");
         return new PreparedCanvas(this,newWidth,newHeight);
     }
     // A failed preparation or settings write must leave the old canvas and image intact.
@@ -82,6 +82,7 @@ public sealed class PreviewHost : NativeControlHost, ICoverRenderer
             try{candidate=new(width,height);candidate.AttachPreview(child);candidate.Present(new(new byte[checked(width*height*4)],0));}
             catch{Dispose();throw;}
         }
+        internal RenderSession? Session=>candidate;
         public void Commit()
         {
             Dispatcher.UIThread.VerifyAccess();
@@ -96,6 +97,13 @@ public sealed class PreviewHost : NativeControlHost, ICoverRenderer
     public void SetCover(CoverImage? image)=>Canvas.SetCover(image);
     public void SetCoverMix(float amount)=>Canvas.SetCoverMix(amount);
     public void Redraw(){if(Ready)Canvas.Redraw();}
+    internal void AcceptPreparedCover(CoverImage? image)
+    {
+        coverBinding.AcceptImage(image);
+        if(!Ready)return;
+        if(Cover!=null)coverBinding.Apply(Cover,Canvas);
+        Canvas.Redraw();Canvas.RefreshOutput();
+    }
     internal void RefreshCover()
     {
         if(!Ready||Canvas.SharedDeviceError<0)return;

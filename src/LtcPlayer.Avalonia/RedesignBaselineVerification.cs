@@ -28,7 +28,7 @@ public static class RedesignBaselineVerification
             await Task.Delay(1000);var playing=w.Preview.Snapshot;
             await w.Preview.PauseAsync();elapsed.Restart();await w.Preview.SeekAsync(2);double seekMs=elapsed.Elapsed.TotalMilliseconds;
             process.Refresh();observations.Add(new{test="manual-hap",loadMs,playMs,seekMs,playing.Presented,playing.Position,WorkingSet=process.WorkingSet64,Handles=process.HandleCount});
-            observations.Add(new{test="output-transition-source-audit",Result="Current ArmAsync stops sync preview, calls SetArmedAsync, re-inspects enabled cues and recreates presentation HWND; output stop reconstructs preview. These are removed only in the following migration stages."});
+            observations.Add(new{test="output-transition-source-audit",Result="Current ArmAsync stops sync preview, calls SetSyncOwnershipAsync, re-inspects enabled cues and recreates presentation HWND; output stop reconstructs preview. These are removed only in the following migration stages."});
             File.WriteAllText(Path.Combine(folder,"observations.json"),JsonSerializer.Serialize(observations,new JsonSerializerOptions{WriteIndented=true}));
         }
         catch(Exception e){File.WriteAllText(Path.Combine(folder,"failure.txt"),e.ToString());MainWindow.Shutdown(1);return;}

@@ -65,7 +65,7 @@ public static class AudioServiceVerification
    });
    await Test("source failure latches audio error and explicit retry recovers",async()=>{
     Source("missing.mp4");await using var s=new AudioOutputService(Read,true);await s.ConfigureAsync(true,"",.5f,false);double end=MasterClock.Timestamp()+3;while(s.Snapshot.State!=SharedAudioState.Error&&MasterClock.Timestamp()<end)await Task.Delay(10);
-    Check(s.Snapshot.State==SharedAudioState.Error&&AudioOutputSink.ActiveStreams==0,"failure not isolated");Source();await s.ConfigureAsync(true,"",.5f,false);await Wait(()=>s.Snapshot.State==SharedAudioState.Playing,s);
+    Check(s.Snapshot.State==SharedAudioState.Error&&AudioDecodeSession.ActiveDecoders==0,"failure not isolated");var sink=s.Snapshot.SinkSession;Source();double retryEnd=MasterClock.Timestamp()+5;while(s.Snapshot.State!=SharedAudioState.Playing&&MasterClock.Timestamp()<retryEnd)await Task.Delay(5);Check(s.Snapshot.State==SharedAudioState.Playing,"next source did not recover");Check(s.Snapshot.SinkSession==sink,"next source reopened device");
    });
    Check(AudioOutputSink.ActiveStreams==0&&AudioDecodeSession.ActiveDecoders==0,"final resource leak");
   }

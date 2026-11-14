@@ -5,7 +5,18 @@ public struct OutputDisplay
 {
     public int X, Y, Width, Height, Primary;
     [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string Name;
-    public override readonly string ToString() => $"{Name}  {Width}×{Height} ({X}, {Y})" + (Primary != 0 ? " メイン" : "");
+    // Name is the Windows device key used by native output and saved settings.
+    // Format only its presentation; never replace the key with a UI label.
+    public static string Label(string? name)
+    {
+        const string prefix=@"\\.\DISPLAY";
+        if(name!=null&&name.StartsWith(prefix,StringComparison.OrdinalIgnoreCase)){
+            string number=name[prefix.Length..];
+            if(number.Length>0&&number.All(char.IsAsciiDigit))return "ディスプレイ "+number;
+        }
+        return string.IsNullOrWhiteSpace(name)?"ディスプレイ":name;
+    }
+    public override readonly string ToString() => $"{Label(Name)}  {Width}×{Height}" + (Primary != 0 ? " · メイン" : "");
 }
 [StructLayout(LayoutKind.Sequential)]
 public struct OutputBounds { public int Left, Top, Right, Bottom; }
@@ -32,7 +43,7 @@ public sealed class VideoRenderer : IDisposable,ICoverRenderer
     public static OutputDisplay[] Displays()
     {
         var data = new OutputDisplay[32]; int count = Native.output_displays(data, data.Length);
-        if (count <= 0 || count > data.Length) throw new IOException("出力ディスプレイ一覧を取得できません。");
+        if (count <= 0 || count > data.Length) throw new IOException("出力先一覧の取得失敗");
         return data.Take(count).ToArray();
     }
     public OutputPresentationMode OutputMode{get;private set;}
@@ -43,9 +54,9 @@ public sealed class VideoRenderer : IDisposable,ICoverRenderer
         try{Check(Call(composited?"output_create:BitBlt":"output_create:Flip",()=>composited?Native.output_create_composited(ref display,out handle,global::LtcPlayer.Avalonia.Program.VerificationOutput?1:0):global::LtcPlayer.Avalonia.Program.VerificationOutput?Native.output_create_probe(ref display,out handle):Native.output_create(ref display,out handle)));}
         catch{trace?.Dispose();throw;}
         int actual=Native.output_presentation_mode(handle);
-        if(actual is not (0 or 1)){Dispose();throw new IOException("実際の表示方式を取得できません。");}
+        if(actual is not (0 or 1)){Dispose();throw new IOException("出力方式の取得失敗");}
         OutputMode=(OutputPresentationMode)actual;
-        if(OutputMode!=outputMode){Dispose();throw new IOException("指定した表示方式を開始できません。");}
+        if(OutputMode!=outputMode){Dispose();throw new IOException("指定の出力方式を開始できません");}
     }
     private void ThreadCheck() { if (thread != Environment.CurrentManagedThreadId) throw new InvalidOperationException("Renderer thread mismatch"); }
     public void Present(byte[] pixels) { ThreadCheck(); Check(Call("output_frame",()=>Native.output_frame(handle,pixels,pixels.Length)));UpdateMonitor(); }
@@ -58,8 +69,8 @@ public sealed class VideoRenderer : IDisposable,ICoverRenderer
     public OutputBounds Bounds() { ThreadCheck(); Check(Native.output_bounds(handle, out var bounds)); return bounds; }
     private static void Check(int code)
     {
-        if (code == unchecked((int)0x800704C7)) throw new OperationCanceledException("出力ウィンドウを閉じました。");
-        if (code < 0) throw new IOException($"D3D11/DXGI失敗: 0x{code:X8}");
+        if (code == unchecked((int)0x800704C7)) throw new OperationCanceledException("出力ウィンドウ終了");
+        if (code < 0) throw new IOException($"GPU処理エラー（0x{code:X8}）");
     }
     public void Dispose() { ThreadCheck(); if (handle != 0) { try{Call("output_destroy",()=>{Native.output_destroy(handle);return 0;});}finally{handle=0;trace?.Dispose();} } }
     private static class Native

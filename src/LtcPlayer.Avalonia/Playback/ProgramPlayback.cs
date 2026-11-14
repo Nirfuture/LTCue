@@ -2,6 +2,8 @@ using Dispatcher = LtcPlayer.Avalonia.UiDispatcher;
 namespace LtcPlayer.App;
 public record ProgramObservation(SyncState State,string Ltc,Guid? CueId,Guid? PreloadId,double Target,double? FramePts,int Presented,int Skipped,int Repeated,int Seeks,string Warning)
 {
+    // Actionable failures for the preview. Warning also includes timing diagnostics.
+    public string Notice{get;init;}="";
     public double HostSeconds{get;init;}=MasterClock.Timestamp();
     public uint VerificationPixelBgra{get;init;}
     public ProgramMonitorStatus? Monitor{get;init;}
@@ -25,6 +27,7 @@ public sealed class ManualOutputControl
 }
 public sealed class ProgramPlayback
 {
+    static bool IsMaterialFailure(Exception e)=>e is IOException or InvalidDataException or UnauthorizedAccessException or OperationCanceledException or System.Text.Json.JsonException or System.Threading.Channels.ChannelClosedException;
     internal static Action<VideoRenderer>? ProbeObserver {get;set;}
     private readonly Dispatcher dispatcher;
     public ProgramPlayback(Dispatcher dispatcher)=>this.dispatcher=dispatcher;
@@ -45,10 +48,10 @@ public sealed class ProgramPlayback
         }
         public ValueTask DisposeAsync()=>buffer.DisposeAsync();
     }
-    public async Task RunAsync(IReadOnlyList<ScheduledCue> cues,OutputDisplay display,MasterClock clock,double offset,Action<ProgramObservation> observe,CancellationToken token,bool verify=false,nint monitorWindow=0,Action? stopRequested=null,Action<int>? monitorError=null,OutputPresentationMode outputMode=OutputPresentationMode.Standard,ManualOutputControl? manualControl=null,IProgramPresentation? presentation=null,CoverController? cover=null,Dictionary<string,MediaDecoder>? analysisCache=null,CueScheduler? timeline=null)
+    public async Task RunAsync(IReadOnlyList<ScheduledCue> cues,OutputDisplay display,MasterClock clock,double offset,Action<ProgramObservation> observe,CancellationToken token,bool verify=false,nint monitorWindow=0,Action? stopRequested=null,Action<int>? monitorError=null,OutputPresentationMode outputMode=OutputPresentationMode.Standard,ManualOutputControl? manualControl=null,IProgramPresentation? presentation=null,CoverController? cover=null,Dictionary<string,MediaDecoder>? analysisCache=null,CueScheduler? timeline=null,PlaybackTimeline? sourceTimeline=null,HapIndexCache? indexCache=null)
     {
         OutputPresentation.Validate(outputMode);
-        var scheduler=timeline??new CueScheduler(cues);VideoRenderer? renderer=null;CueFrames? active=null,preload=null,recovery=null;bool monitorFaultNotified=false;
+        var source=sourceTimeline??new PlaybackTimeline();if(sourceTimeline==null)source.Update(cues);VideoRenderer? renderer=null;CueFrames? active=null,preload=null,recovery=null;bool monitorFaultNotified=false;
         var black=new byte[checked(display.Width*display.Height*4)];int epoch=-1,presented=0,skipped=0,repeated=0,seeks=0;
         double? lastPts=null;Guid? lastId=null,displayedId=null;double? displayedPts=null;uint verificationPixel=0;
         ProgramMonitorStatus? monitorStatus=null;double nextMonitorSample=0;
@@ -64,9 +67,9 @@ public sealed class ProgramPlayback
                 var pinned=new[]{active?.Cue.FilePath,preload?.Cue.FilePath,recovery?.Cue.FilePath}.Where(p=>p!=null).Select(p=>Path.GetFullPath(p!)).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var unused=analyses.Keys.FirstOrDefault(p=>!pinned.Contains(p));
                 if(unused!=null)analyses.Remove(unused);
-                else return new MediaDecoder(reuseAnalysis:true,gpuScaling:true);
+                else return new MediaDecoder(reuseAnalysis:true,gpuScaling:true,indexCache:indexCache);
             }
-            decoder=new MediaDecoder(reuseAnalysis:true,gpuScaling:true);analyses.Add(key,decoder);return decoder;
+            decoder=new MediaDecoder(reuseAnalysis:true,gpuScaling:true,indexCache:indexCache);analyses.Add(key,decoder);return decoder;
         }
         try
         {
@@ -83,7 +86,7 @@ public sealed class ProgramPlayback
                 });
                 double targetHost=MasterClock.Timestamp();var s=clock.Read(targetHost);double now=s.Seconds+offset;
                 lag=null;
-                string warning="";byte[]? pixels=null;VideoFrame? texture=null;
+                string warning="",notice="";byte[]? pixels=null;VideoFrame? texture=null;Guid? candidateId=displayedId;double? candidatePts=displayedPts;
                 bool unavailable=s.State is SyncState.WAITING or SyncState.LOST;
                 var command=manualControl?.Read();bool restart=false;
                 if(command!=null&&command.Version!=commandVersion){
@@ -99,51 +102,93 @@ public sealed class ProgramPlayback
                 if(manual&&manualReady&&!manualHolding)manualPosition=Math.Min(MasterClock.Timestamp()-manualStarted,Math.Max(0,manualCue!.Duration-1/manualCue.FrameRate));
                 if(manual&&manualReady&&MasterClock.Timestamp()-manualStarted>=manualCue!.Duration)manualHolding=true;
                 if(manual)now=manualCue!.Start+manualPosition;
-                var selected=manual?manualCue:s.State==SyncState.WAITING?null:scheduler.Select(now);
-                var upcoming=manual?null:scheduler.Next(s.State==SyncState.WAITING?double.NegativeInfinity:now);
+                // A held image belongs to the opened source, not to a newly edited schedule.
+                var selected=manual?manualCue:s.State is SyncState.LOST or SyncState.ERROR?active?.Cue:s.State==SyncState.WAITING?null:source.Select(now,s.Generation);
+                var upcoming=manual?null:source.Next(s.State==SyncState.WAITING?double.NegativeInfinity:now);
+                bool RefreshPosition()
+                {
+                    double host=MasterClock.Timestamp();var latest=clock.Read(host);
+                    if(!s.MatchesPlaybackAuthority(latest))return false;
+                    s=latest;targetHost=host;
+                    if(manual){if(manualReady&&!manualHolding)manualPosition=Math.Min(host-manualStarted,Math.Max(0,manualCue!.Duration-1/manualCue.FrameRate));now=manualCue!.Start+manualPosition;}
+                    else now=s.Seconds+offset;
+                    selected=manual?manualCue:s.State is SyncState.LOST or SyncState.ERROR?active?.Cue:s.State==SyncState.WAITING?null:source.Select(now,s.Generation);
+                    upcoming=manual?null:source.Next(s.State==SyncState.WAITING?double.NegativeInfinity:now);
+                    return true;
+                }
                 if(manual||s.State is not (SyncState.LOST or SyncState.ERROR))
                 {
                     bool jump=epoch!=s.Generation||restart||manual!=wasManual;wasManual=manual;
-                    if(jump){if(active!=null){await active.DisposeAsync();active=null;}if(preload!=null){await preload.DisposeAsync();preload=null;}if(recovery!=null){await recovery.DisposeAsync();recovery=null;}nextRecovery=0;epoch=s.Generation;}
-                    if(active?.Cue.CueId!=selected?.CueId)
+                    if(jump)
+                    {
+                        if(active!=null){await active.DisposeAsync();active=null;}
+                        if(preload!=null){await preload.DisposeAsync();preload=null;}
+                        if(recovery!=null){await recovery.DisposeAsync();recovery=null;}
+                        nextRecovery=0;epoch=s.Generation;
+                        if(!RefreshPosition())continue;
+                    }
+                    if(!Equals(active?.Cue,selected))
                     {
                         if(active!=null){await active.DisposeAsync();active=null;}
                         if(recovery!=null){await recovery.DisposeAsync();recovery=null;}nextRecovery=0;
+                        if(!RefreshPosition())continue;
                         if(selected!=null)
                         {
                             double relative=now-selected.Start;
-                            if(preload?.Cue.CueId==selected.CueId && relative<0.5){active=preload;preload=null;}
-                            else {active=new(selected,display,Math.Max(0,relative-0.2),token,DecoderFor(selected));++seeks;}
+                            if(Equals(preload?.Cue,selected) && relative<0.5){active=preload;preload=null;}
+                            // One frame of preroll provides a sample at/before the target.
+                            // A fixed 200ms rewind can itself trigger the 200ms lag recovery.
+                            else {active=new(selected,display,Math.Max(0,relative-1/selected.FrameRate),token,DecoderFor(selected));++seeks;}
                         }
                     }
-                    if(upcoming?.CueId!=preload?.Cue.CueId)
+                    if(!Equals(upcoming,preload?.Cue))
                     {
                         if(preload!=null){await preload.DisposeAsync();preload=null;}
                         if(upcoming!=null&&recovery==null)preload=new(upcoming,display,0,token,DecoderFor(upcoming));
                     }
-                    preload?.Prime();
+                    if(preload!=null){
+                        try{preload.Prime();}
+                        catch(Exception e)when(!token.IsCancellationRequested&&IsMaterialFailure(e)){
+                            var failed=preload;preload=null;source.Fail(failed.Cue,e);await failed.DisposeAsync();
+                        }
+                    }
+                    // Disposal/preload waits may advance LTC or cross a cue boundary.
+                    if(!RefreshPosition()||!Equals(active?.Cue,selected))continue;
                     if(selected==null)pixels=black;
                     else
                     {
                         double relative=now-selected.Start;
-                        var frame=active!.Select(relative,out int dropped);skipped+=dropped;
+                        VideoFrame? frame=null;bool materialFailed=false;
+                        try{frame=active!.Select(relative,out int dropped);skipped+=dropped;}
+                        catch(Exception e)when(!token.IsCancellationRequested&&IsMaterialFailure(e)){
+                            source.Fail(selected,e);materialFailed=true;pixels=black;texture=null;candidateId=null;candidatePts=null;
+                            // Silence/black is published before waiting for decoder disposal.
+                            await dispatcher.InvokeAsync(()=>{if(!s.MatchesPlaybackAuthority(clock.Read()))return;if(presentation!=null)presentation.Present(new VideoFrame(black,now));else renderer!.Present(black);displayedId=null;displayedPts=null;});
+                            if(active!=null){await active.DisposeAsync();active=null;}
+                            if(recovery!=null){await recovery.DisposeAsync();recovery=null;}
+                            selected=null;
+                        }
                         // Keep the current decoder while its replacement prepares. Never
                         // cancel a slow preparation repeatedly just because LTC advances.
-                        if(recovery!=null){
-                            var replacement=recovery.Select(relative,out int recoveryDropped);skipped+=recoveryDropped;
-                            if(replacement!=null){await active.DisposeAsync();active=recovery;recovery=null;frame=replacement;}
+                        if(!materialFailed&&recovery!=null){
+                            try{
+                                var replacement=recovery.Select(relative,out int recoveryDropped);skipped+=recoveryDropped;
+                                if(replacement!=null){await active!.DisposeAsync();active=recovery;recovery=null;frame=replacement;}
+                            }catch(Exception e)when(!token.IsCancellationRequested&&IsMaterialFailure(e)){
+                                notice=warning="再同期準備失敗："+e.Message;await recovery!.DisposeAsync();recovery=null;nextRecovery=MasterClock.Timestamp()+2;
+                            }
                         }
-                        double limit=Math.Max(.2,3/selected.FrameRate);
-                        if(frame!=null){
+                        double limit=Math.Max(.2,3/(selected?.FrameRate??25));
+                        if(!materialFailed&&frame!=null){
                             lag=Math.Max(0,relative-frame.Seconds);
                             if(!manual&&lag>limit){
-                                warning=$"映像がLTCから{lag:F2}秒遅れています。処理能力・素材・出力設定を確認してください。";
+                                warning+=(warning==""?"":" ")+$"映像が{lag:F2}秒遅延";
                                 double stamp=MasterClock.Timestamp();
                                 if(recovery==null&&stamp>=nextRecovery){
                                     // Include observed preparation cost in the target. A
                                     // future first frame waits until its own TC is reached.
-                                    double lead=Math.Clamp((active.ReadyAfter??0)+.15,.25,2);
-                                    if(relative+lead<selected.Duration){
+                                    double lead=Math.Clamp((active!.ReadyAfter??0)+.15,.25,2);
+                                    if(relative+lead<selected!.Duration){
                                         // Reuse the next-cue decoder's resource budget.
                                         if(preload!=null){await preload.DisposeAsync();preload=null;}
                                         recovery=new(selected,display,relative+lead,token,DecoderFor(selected));nextRecovery=stamp+1;recoveryAttempts++;seeks++;
@@ -151,20 +196,39 @@ public sealed class ProgramPlayback
                                 }
                             }
                         }
-                        if(recovery!=null)warning+=(warning==""?"":" ")+"LTCの現在位置へ再同期中です。";
-                        if(frame==null)warning="準備待ち: 直前の映像を保持しています。";
-                        else {if(manual&&!manualReady){manualStarted=MasterClock.Timestamp()-manualPosition;manualReady=true;}pixels=frame.Pixels;texture=frame;displayedId=selected.CueId;displayedPts=frame.Seconds;if(lastId==selected.CueId && lastPts==frame.Seconds)++repeated;lastId=selected.CueId;lastPts=frame.Seconds;}
+                        if(recovery!=null)warning+=(warning==""?"":" ")+"映像を再同期中";
+                        if(materialFailed)notice=warning="素材の読込失敗（復旧・次キュー待ち）";
+                        else if(frame==null)warning="映像準備中（前の映像を保持）";
+                        else {if(manual&&!manualReady){manualStarted=MasterClock.Timestamp()-manualPosition;manualReady=true;}pixels=frame.Pixels;texture=frame;candidateId=selected!.CueId;candidatePts=frame.Seconds;}
                     }
-                    if(pixels==black){displayedId=null;displayedPts=null;}
+                    if(pixels==black){candidateId=null;candidatePts=null;}
                 }
                 if(pixels!=null)
                 {
-                    byte[]? verifiedPixels=null;
-                    await dispatcher.InvokeAsync(()=>{token.ThrowIfCancellationRequested();if(presentation!=null)presentation.Present(texture??new VideoFrame(pixels,now));else{if(cover!=null)coverBinding.Apply(cover,renderer!);if(texture!=null)renderer!.Present(texture);else renderer!.Present(pixels);}if(verify){if(texture?.TextureFormat is >0)verifiedPixels=renderer!.Readback();else{renderer!.Verify(pixels);verifiedPixels=pixels;}}});++presented;
+                    byte[]? verifiedPixels=null;bool adopted=false;
+                    await dispatcher.InvokeAsync(()=>{
+                        token.ThrowIfCancellationRequested();
+                        if(!s.MatchesPlaybackAuthority(clock.Read()))return;
+                        if(presentation!=null)presentation.Present(texture??new VideoFrame(pixels,now));
+                        else{
+                            if(cover!=null)coverBinding.Apply(cover,renderer!);
+                            if(texture!=null)renderer!.Present(texture);else renderer!.Present(pixels);
+                        }
+                        if(verify){
+                            if(texture?.TextureFormat is >0)verifiedPixels=renderer!.Readback();
+                            else{renderer!.Verify(pixels);verifiedPixels=pixels;}
+                        }
+                        adopted=true;
+                    });
+                    if(!adopted)continue;
+                    displayedId=candidateId;displayedPts=candidatePts;
+                    if(texture!=null&&lastId==displayedId&&lastPts==displayedPts)++repeated;
+                    lastId=displayedId;lastPts=displayedPts;++presented;
                     if(verify)verificationPixel=BitConverter.ToUInt32(verifiedPixels!,(verifiedPixels!.Length/8)*4);
                 }
                 else await dispatcher.InvokeAsync(()=>{if(presentation!=null)presentation.Refresh();else if(cover!=null&&coverBinding.Apply(cover,renderer!))renderer!.Redraw();});
-                observe(new(s.State,s.Label,displayedId,preload?.Cue.CueId,now,displayedPts,presented,skipped,repeated,seeks,warning){ScheduledCue=selected,TargetHostSeconds=targetHost,VerificationPixelBgra=verificationPixel,Monitor=monitorStatus,LagSeconds=lag,Recovering=recovery!=null,RecoveryAttempts=recoveryAttempts,InputGeneration=s.Generation,OutputMode=renderer?.OutputMode??outputMode,Manual=manual,Holding=manualHolding});
+                if(!s.MatchesPlaybackAuthority(clock.Read()))continue;
+                observe(new(s.State,s.Label,displayedId,preload?.Cue.CueId,now,displayedPts,presented,skipped,repeated,seeks,warning){Notice=notice,ScheduledCue=selected,TargetHostSeconds=targetHost,VerificationPixelBgra=verificationPixel,Monitor=monitorStatus,LagSeconds=lag,Recovering=recovery!=null,RecoveryAttempts=recoveryAttempts,InputGeneration=s.Generation,OutputMode=renderer?.OutputMode??outputMode,Manual=manual,Holding=manualHolding});
                 await Task.Delay(8,token).ConfigureAwait(false);
             }
         }

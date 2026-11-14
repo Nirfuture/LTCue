@@ -39,9 +39,9 @@
 
 ## 動作確認の範囲
 
-現在はプレビュー版です。preview.11では2台のPCで開始時間を計測、外部ディスプレイの物理切断・再接続も限定的に確認しています。
+現在はプレビュー版です。移行前のpreview.11では2台のPCで開始時間を計測、外部ディスプレイの物理切断・再接続も限定的に確認しています。
 
-2時間以上の連続稼働、物理画面と出音の同期精度は未確認です。各版の確認範囲は[確認記録](releases/0.1.0-preview.11.md)、開始時間は[検証環境A](https://github.com/Nirfuture/LTCue/blob/main/docs/STARTUP_CHECK_ENV_A.md)・[検証環境B](https://github.com/Nirfuture/LTCue/blob/main/docs/STARTUP_CHECK_ENV_B.md)を参照してください。
+2時間以上の連続稼働、物理画面と出音の同期精度は未確認です。各版の確認範囲は[確認記録](releases/0.1.0.md)、開始時間は[検証環境A](https://github.com/Nirfuture/LTCue/blob/main/docs/STARTUP_CHECK_ENV_A.md)・[検証環境B](https://github.com/Nirfuture/LTCue/blob/main/docs/STARTUP_CHECK_ENV_B.md)を参照してください。
 
 次の環境・機能も未検証です。
 

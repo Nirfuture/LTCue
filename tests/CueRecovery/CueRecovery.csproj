@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+ <ItemGroup>
+  <Compile Include="../SyncRecovery/Stubs.cs" Link="Stubs.cs"/>
+  <Compile Include="../../src/LtcPlayer.App/CueProgram.cs" Link="CueProgram.cs"/>
+  <Compile Include="../../src/LtcPlayer.App/PlaybackTimeline.cs" Link="PlaybackTimeline.cs"/>
+  <Compile Include="../../src/LtcPlayer.App/MasterClock.cs" Link="MasterClock.cs"/>
+  <Compile Include="../../src/LtcPlayer.App/InputSettings.cs" Link="InputSettings.cs"/>
+  <Compile Include="../../src/LtcPlayer.Avalonia/Playback/CoverController.cs" Link="CoverController.cs"/>
+  <Compile Include="../../src/LtcPlayer.Avalonia/MaterialMonitor.cs" Link="MaterialMonitor.cs"/>
+ </ItemGroup>
+</Project>

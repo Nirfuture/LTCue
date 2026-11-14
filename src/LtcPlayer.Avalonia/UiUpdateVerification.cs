@@ -25,8 +25,8 @@ public static class UiUpdateVerification
     await w.Monitor.ConfigureAsync(new(Rate:"25"),async(clock,token)=>{int i=0;while(!token.IsCancellationRequested){clock.Accept(new TcFrame{Seconds=(i/25)%60,Frame=i%25},MasterClock.Timestamp());i++;await Task.Delay(40,token);}});
     int starts=w.Monitor.Starts;await w.ArmAsync();await Until(()=>w.LatestObservation?.Presented>5);
     var decision=new TaskCompletionSource<bool>();w.ConfirmStopForTest=_=>decision.Task;int before=w.LatestObservation!.Presented;var request=w.RequestStopAsync(false);
-    await Task.Delay(250);Check(w.LatestObservation!.Presented>before,"confirmation blocked output");Check(w.Delivery==DeliveryState.ConfirmingStop,"confirmation state");decision.SetResult(false);Check(!await request&&w.IsArmed,"cancel stopped output");
-    Check(w.Monitor.Starts==starts,"input reopened on ARM");w.ConfirmStopForTest=_=>Task.FromResult(true);Check(await w.RequestStopAsync(false)&&!w.IsArmed,"accept did not stop");Check(w.Monitor.Starts==starts,"input reopened on stop");var a=w.Monitor.Clock.Read().Label;await Task.Delay(90);Check(w.Monitor.Clock.Read().Label!=a,"idle monitoring stopped");
+    await Task.Delay(250);Check(w.LatestObservation!.Presented>before,"confirmation blocked output");Check(w.Delivery==DeliveryState.ConfirmingStop,"confirmation state");decision.SetResult(false);Check(!await request&&w.IsOutputActive,"cancel stopped output");
+    Check(w.Monitor.Starts==starts,"input reopened on ARM");w.ConfirmStopForTest=_=>Task.FromResult(true);Check(await w.RequestStopAsync(false)&&!w.IsOutputActive,"accept did not stop");Check(w.Monitor.Starts==starts,"input reopened on stop");var a=w.Monitor.Clock.Read().Label;await Task.Delay(90);Check(w.Monitor.Clock.Read().Label!=a,"idle monitoring stopped");
     return new{InputStarts=starts,ContinuedDuringConfirmation=true,ContinuedAfterStop=true};
    });
    await Test("HAP/HAPQ GPU monitor versus presented source",async()=>{

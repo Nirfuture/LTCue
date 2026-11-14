@@ -4,8 +4,9 @@ namespace LtcPlayer.App;
 public sealed class PreviewProgramPresentation : IProgramPresentation
 {
     readonly global::LtcPlayer.Avalonia.PreviewHost host;
-    public PreviewProgramPresentation(global::LtcPlayer.Avalonia.PreviewHost host)=>this.host=host;
-    public void Present(VideoFrame frame)=>host.Present(frame);
+    readonly Func<bool> mayPresent;
+    public PreviewProgramPresentation(global::LtcPlayer.Avalonia.PreviewHost host,Func<bool>? mayPresent=null){this.host=host;this.mayPresent=mayPresent??(()=>true);}
+    public void Present(VideoFrame frame){if(mayPresent())host.Present(frame);}
     public void Refresh()=>host.RefreshCover();
     public void Dispose(){} // Canvas lifetime belongs to the host, not this source.
 }

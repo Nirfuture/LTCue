@@ -13,7 +13,7 @@ public static class AudioConnectedVerification
   try
   {
    var display=VideoRenderer.Displays().First(d=>d.Primary!=0);await w.ApplySettingsAsync(new(new(Rate:"29.97 DF",OutputMode:OutputPresentationMode.Compatibility),display));
-   var row=new CueRow{FilePath=Path.Combine(Program.Option("--fixtures")!,"h264-aac.mp4")};await ShowProgramService.RefreshAsync(row,CancellationToken.None);w.Editor.Add(row);w.FindControl<DataGrid>("CueGrid")!.SelectedItem=row;await Until(()=>w.Preview.Snapshot.State==PreviewState.Ready);
+   var row=new CueRow{FilePath=Path.Combine(Program.Option("--fixtures")!,"h264-aac.mp4")};await ShowProgramService.RefreshAsync(row,CancellationToken.None);w.Editor.Add(row);w.FindControl<DataGrid>("CueGrid")!.SelectedItem=row;await w.Preview.LoadAsync(row.FilePath);
    await w.SetSharedAudioAsync(false,silenceForVerification:true);
    await Test("manual uses video clock and independent shared audio",async()=>{
     await w.Preview.PlayAsync();await Until(()=>w.Preview.Snapshot.Position>.2);Check(PreviewAudio.ActiveStreams==0&&w.Preview.Snapshot.Audio==null,"legacy audio clock retained");
@@ -35,7 +35,7 @@ public static class AudioConnectedVerification
    });
    await w.Monitor.ConfigureAsync(new(Rate:"29.97 DF"),async(clock,token)=>{while(!token.IsCancellationRequested){if(Volatile.Read(ref receiving)!=0){int f=Interlocked.Increment(ref frames);clock.Accept(new TcFrame{Seconds=f/30,Frame=f%30,Drop=1},MasterClock.Timestamp());}await Task.Delay(33,token);}});
    await Test("LTC preempts manual and drives audio from scheduled cue time",async()=>{
-    Volatile.Write(ref receiving,1);await Until(()=>w.SharedAudio.State==SharedAudioState.Playing&&w.SharedAudio.CueId==row.CueId);Check(w.Preview.Armed&&w.Preview.Snapshot.Audio==null,"manual remained active");
+    Volatile.Write(ref receiving,1);await Until(()=>w.SharedAudio.State==SharedAudioState.Playing&&w.SharedAudio.CueId==row.CueId);Check(w.Preview.IsSyncOwned&&w.Preview.Snapshot.Audio==null,"manual remained active");
     Check(Math.Abs(w.SharedAudio.PlayedPts!.Value-(w.PreviewObservation!.Target))<.12,"LTC target mismatch");
    });
    await Test("LTC jump flushes generation while output remains independent",async()=>{

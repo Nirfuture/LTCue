@@ -6,40 +6,87 @@ public sealed class ShowEditor
 {
  public ObservableCollection<CueRow> Rows{get;}=[];
  public TimecodeRate Rate{get;set;}=TimecodeRate.Modes[1];
- public bool Locked{get;set;}
+ public bool Locked=>DefinitionAuthority?.Invoke()==false;
+ public Func<bool>? DefinitionAuthority{get;set;}
+ public Func<bool>? ReorderAuthority{get;set;}
+ bool changingTimecode;
  public event Action? Changed;
  public event Action? PlaybackChanged;
  ScheduledCue[]? playbackDefinition;
  TimecodeRate? validatedRate;
  public string ValidationMessage{get;private set;}="";
  public bool CanArm{get;private set;}
- void Editable(){if(Locked)throw new InvalidOperationException("本番ARM中は編集できません。");}
- public void Add(CueRow row){Editable();Rows.Add(row);row.PropertyChanged+=Edited;Renumber();}
- void Edited(object? sender,PropertyChangedEventArgs e){if(e.PropertyName is nameof(CueRow.Hours) or nameof(CueRow.Minutes) or nameof(CueRow.Seconds) or nameof(CueRow.Frames) or nameof(CueRow.Enabled))Validate();}
+ public ScheduledCue[] Timeline{get;private set;}=[];
+ public string Notices{get;private set;}="";
+ void Editable(){if(Locked)throw new InvalidOperationException("現在は編集できません");}
+ public void Add(CueRow row){Editable();ShowProgramService.RepairIds(Rows.Append(row));Rows.Add(row);row.PropertyChanged+=Edited;Renumber();}
+ void Edited(object? sender,PropertyChangedEventArgs e){if(!changingTimecode&&e.PropertyName is nameof(CueRow.Hours) or nameof(CueRow.Minutes) or nameof(CueRow.Seconds) or nameof(CueRow.Frames) or nameof(CueRow.Enabled) or nameof(CueRow.FilePath))Validate();}
  public void Validate()
  {
   ScheduledCue[]? next=null;
-  try{var valid=ShowProgramService.Validate(Rows,Rate);CanArm=valid.Count>0;ValidationMessage=$"キュー {Rows.Count}件 / 有効 {valid.Count}件";next=valid.OrderBy(c=>c.Start).ThenBy(c=>c.CueId).ToArray();}
-  catch(Exception e){CanArm=false;ValidationMessage=e.Message;}
+  try{
+   var result=ShowProgramService.Evaluate(Rows,Rate);
+   foreach(var item in result.Rows){item.Row.Error=item.Error;item.Row.Warning=item.Warning;}
+   Timeline=result.Timeline.ToArray();
+   CanArm=true;ValidationMessage="";
+   next=Timeline.OrderBy(c=>c.Start).ThenBy(c=>c.CueId).ToArray();
+  }catch(Exception e){CanArm=false;Timeline=[];ValidationMessage=e.Message;}
   bool changed=validatedRate!=Rate||(playbackDefinition==null)!=(next==null)||(next!=null&&playbackDefinition!=null&&!next.SequenceEqual(playbackDefinition));
   validatedRate=Rate;playbackDefinition=next;
   if(changed)PlaybackChanged?.Invoke();
   Changed?.Invoke();
  }
  public void Renumber(){for(int i=0;i<Rows.Count;i++)Rows[i].DisplayOrder=i;Validate();}
- public void Delete(CueRow row){Editable();row.PropertyChanged-=Edited;Rows.Remove(row);Renumber();}
+ public void Delete(CueRow row)=>DeleteMany([row.CueId]);
+ public int DeleteMany(IEnumerable<Guid> cueIds)
+ {
+  Editable();var ids=cueIds.ToHashSet();var removed=Rows.Where(row=>ids.Contains(row.CueId)).ToArray();
+  if(removed.Length==0)return 0;
+  // Mutate the collection synchronously; publish the final playback definition once.
+  foreach(var row in removed){row.PropertyChanged-=Edited;Rows.Remove(row);}
+  Renumber();return removed.Length;
+ }
  public CueRow Clone(CueRow row){Editable();var clone=row.CloneDisabled();Add(clone);Move(clone,Rows.IndexOf(row)+1);return clone;}
- public void Move(CueRow row,int target){Editable();if(Rows.Contains(row)){Rows.Move(Rows.IndexOf(row),Math.Clamp(target,0,Rows.Count-1));Renumber();}}
+ public void Move(CueRow row,int target){if(!(ReorderAuthority?.Invoke()??!Locked))throw new InvalidOperationException("現在は並べ替えできません");if(Rows.Contains(row)){Rows.Move(Rows.IndexOf(row),Math.Clamp(target,0,Rows.Count-1));Renumber();}}
  public async Task ImportAsync(IEnumerable<string> paths,string start)
  {
-  Editable();foreach(var path in paths){var row=new CueRow{FilePath=Path.GetFullPath(path)};row.SetStart(start);await ShowProgramService.RefreshAsync(row,CancellationToken.None);Editable();Add(row);}
+  Editable();var prepared=new List<CueRow>();foreach(var path in paths){var row=new CueRow{FilePath=Path.GetFullPath(path)};row.SetStart(start);try{await ShowProgramService.RefreshAsync(row,CancellationToken.None);}catch(Exception e){row.SourceError=e.Message;}prepared.Add(row);}
+#if VERIFICATION
+  if(BeforeImportApplyForTest!=null)await BeforeImportApplyForTest();
+#endif
+  Editable();foreach(var row in prepared){ShowProgramService.RepairIds(Rows.Append(row));Rows.Add(row);row.PropertyChanged+=Edited;}Renumber();
  }
  public async Task LoadAsync(string file)
  {
   Editable();var load=await ShowProgramService.LoadAsync(file,CancellationToken.None);Editable();
-  foreach(var r in Rows)r.PropertyChanged-=Edited;Rows.Clear();Rate=load.Rate;
-  foreach(var r in load.Rows){Rows.Add(r);r.PropertyChanged+=Edited;}
-  Renumber();
+  Replace(load);
  }
- public Task SaveAsync(string file){Editable();return ShowProgramService.SaveAsync(file,Rows,Rate);}
+ public void Replace((TimecodeRate Rate,List<CueRow> Rows,List<string> Notices) load)
+ {
+  Editable();foreach(var r in Rows)r.PropertyChanged-=Edited;Rows.Clear();Rate=load.Rate;
+  foreach(var r in load.Rows){Rows.Add(r);r.PropertyChanged+=Edited;}
+  Notices=string.Join(" / ",load.Notices);Renumber();
+ }
+ public void SetEnabled(CueRow row,bool value){Editable();if(Rows.Contains(row))row.Enabled=value;}
+ public void SetTimecode(CueRow row,string[] parts)
+ {
+  Editable();if(!Rows.Contains(row)||parts.Length!=4)return;
+  changingTimecode=true;try{row.Hours=parts[0];row.Minutes=parts[1];row.Seconds=parts[2];row.Frames=parts[3];}finally{changingTimecode=false;}Validate();
+ }
+ public Task SaveAsync(string file,CancellationToken token=default)
+ {
+  var document=ShowProgramService.Capture(Rows,Rate);
+  return SaveSnapshotAsync(file,document,token);
+ }
+#if VERIFICATION
+ internal Func<CancellationToken,Task>? BeforeSaveWriteForTest{get;set;}
+ internal Func<Task>? BeforeImportApplyForTest{get;set;}
+#endif
+ async Task SaveSnapshotAsync(string file,ShowProgramDocument document,CancellationToken token)
+ {
+#if VERIFICATION
+  if(BeforeSaveWriteForTest!=null)await BeforeSaveWriteForTest(token);
+#endif
+  await ShowProgramService.SaveDocumentAsync(file,document,token);
+ }
 }

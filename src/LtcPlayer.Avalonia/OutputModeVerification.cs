@@ -39,7 +39,7 @@ public static class OutputModeVerification
       for(int i=0;i<700&&window.LatestObservation is not {Presented:>2};i++)await Task.Delay(15);
       Check(window.LatestObservation is {Presented:>2},"no frames");actual=window.Surface.Canvas.OutputMode;Check(actual==mode&&window.LatestObservation!.OutputMode==mode,"wrong actual output mode");
       await Task.Delay(150);Check(window.FindControl<TextBlock>("OutputModeLabel")!.Text!.Contains(OutputPresentation.Label(mode)),"main output-mode label");
-      bool blocked=false;try{await window.ApplySettingsAsync(new(new(OutputMode:mode),display));}catch(InvalidOperationException){blocked=true;}Check(blocked,"output mode changed while streaming");
+      bool blocked=false;try{await window.ApplySettingsAsync(new(new(OutputMode:mode==OutputPresentationMode.Standard?OutputPresentationMode.Compatibility:OutputPresentationMode.Standard),display));}catch(InvalidOperationException){blocked=true;}Check(blocked,"output mode changed while streaming");
       var saved=InputSettings.Load(Program.Option("--settings"));Check(saved.OutputMode==mode,"main settings did not persist mode");
       window.ConfirmStopForTest=_=>Task.FromResult(true);await window.RequestStopAsync(false);return new{Requested=mode,Actual=actual,Persisted=saved.OutputMode};
      }finally{ProgramPlayback.ProbeObserver=null;window.ConfirmStopForTest=null;await window.DisarmAsync();}

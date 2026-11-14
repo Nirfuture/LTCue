@@ -20,7 +20,7 @@ internal static class FileLocation
      Marshal.ThrowExceptionForHR(SHOpenFolderAndSelectItems(item,0,0,0));
     }else{
      string? parent=Path.GetDirectoryName(full);
-     if(parent==null||!Directory.Exists(parent))throw new DirectoryNotFoundException("ファイルと保存先フォルダーが見つかりません："+full);
+     if(parent==null||!Directory.Exists(parent))throw new DirectoryNotFoundException("ファイル・保存先フォルダーなし："+full);
      Process.Start(new ProcessStartInfo(parent){UseShellExecute=true});
     }
     completion.TrySetResult();

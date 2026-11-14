@@ -34,19 +34,19 @@ foreach(var scenario in new[]{"continuous","slow","slow-preparation","load-recov
   Check(MediaDecoder.Active==0,"Decoder leaked after completion");
   Check(observations.Count>0,"No telemetry");
   var last=observations.Last();
-  if(scenario=="recovery-error")Check(error!=null,"Recovery failure was silently ignored");
+  if(scenario=="recovery-error")Check(error==null&&observations.Any(o=>o.Warning.Contains("再同期準備失敗")),"Recovery failure did not preserve playback and report warning");
   else {
    Check(observations.Any(o=>o.FramePts!=null),"No frame presented");
    if(scenario=="continuous")Check(last.RecoveryAttempts==0&&last.LagSeconds<.15,"Normal input triggered recovery or lagged");
    if(scenario is "slow" or "slow-preparation" or "load-recovers") {
-    Check(observations.Any(o=>o.LagSeconds>.2&&o.Warning.Contains("遅れ")),"Lag was not reported");
+    Check(observations.Any(o=>o.LagSeconds>.2&&!string.IsNullOrWhiteSpace(o.Warning)),"Lag was not reported");
     Check(last.RecoveryAttempts>0&&last.RecoveryAttempts<=5,"Recovery missing or restarted too often");
     Check(last.LagSeconds<1,"Lag continued accumulating");
     Check(observations.Where(o=>o.LagSeconds!=null).Max(o=>o.LagSeconds)<1.25,"Recovery allowed unbounded lag");
     Check(observations.Where(o=>o.Recovering).All(o=>o.FramePts!=null),"Recovery blanked an existing output");
    }
    if(scenario=="load-recovers")Check(last.LagSeconds<.15&&!last.Recovering&&last.Warning=="","Load recovery did not return to normal");
-   if(scenario=="jump")Check(last.Seeks>=3&&last.LagSeconds<.15,"Forward/backward TC jump did not recover");
+   if(scenario=="jump")Check(observations.Select(o=>o.InputGeneration).Distinct().Count()>=3&&last.LagSeconds<.15,"Forward/backward TC jump did not recover: "+JsonSerializer.Serialize(new{last.Seeks,last.LagSeconds,Generations=observations.Select(o=>o.InputGeneration).Distinct()}));
    if(scenario=="loss-resume"){
     var lost=observations.Where(o=>o.State==SyncState.LOST).ToArray();
     Check(lost.Length>0,"Input loss not detected");

@@ -8,7 +8,7 @@ ZIPをすべて展開し、`LTCue.exe`を起動してください。.NETラン�
 - [操作リファレンス](docs/USER_GUIDE.md)
 - [対応環境・動画形式](docs/COMPATIBILITY.md)
 - [困ったとき](docs/TROUBLESHOOTING.md)
-- [今回の変更と確認範囲](RELEASE_NOTES.md)
+- [このリリースについて](RELEASE_NOTES.md)
 - [ライセンスについて](NOTICE.md)
 
 実行に必要なDLL、`TestMedia`、`LICENSES`、`CorrespondingSource`は同梱したまま使用してください。`TestMedia`は起動時のテストショーで使用します。

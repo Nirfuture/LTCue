@@ -8,12 +8,10 @@ public partial class MainWindow
  void CueHandleAttached(object? sender,VisualTreeAttachmentEventArgs e){if(sender is Control handle&&handle.GetVisualAncestors().OfType<DataGridCell>().FirstOrDefault() is {} cell)cell.Classes.Add("drag-handle-cell");}
  internal void MoveCue(LtcPlayer.App.CueRow row,int target)
  {
-  if(armed||busy||closing)return;
-  // ObservableCollection.Move can change DataGrid selection before rebinding.
-  // Neither selection notification may reload the currently playing source.
-  previewSelection=row;bool previous=rebinding;rebinding=true;
-  try{Editor.Move(row,target);RebindGrid(row);StatusMessage("表示順を変更しました。");}
-  finally{rebinding=previous;}
+  if(!ReorderAccess.Allowed)return;CommitTimecodeEdit();
+  // Selection is UI state only; reordering never loads or switches media.
+  var selected=SelectedCueIds();var active=(Grid.SelectedItem as LtcPlayer.App.CueRow)?.CueId;
+  Editor.Move(row,target);RebindCueSelection(selected,active);StatusMessage("");
  }
  int? cueInsertionSlot;
  IPointer? cueDragPointer;

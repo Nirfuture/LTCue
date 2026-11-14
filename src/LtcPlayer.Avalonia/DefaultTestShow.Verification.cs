@@ -26,20 +26,20 @@ public static partial class DefaultTestShow
     // backward every half second, repeatedly canceling cold decoder startup.
     // Intentional discontinuities are exercised by SyncRecoveryVerification.
     await w.Monitor.ConfigureAsync(new(Rate:"29.97 DF"),async(clock,token)=>{int index=0,last=-1;while(!token.IsCancellationRequested){int start=Volatile.Read(ref position);if(start!=last){index=0;last=start;}int frame=start*30+index++;if(frame/1800%10!=0&&frame/30%60==0&&frame%30<2){int skipped=2-frame%30;frame+=skipped;index+=skipped;}clock.Accept(new TcFrame{Hours=frame/108000,Minutes=frame/1800%60,Seconds=frame/30%60,Frame=frame%30,Drop=1},MasterClock.Timestamp());await Task.Delay(33,token);}});
-    button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Until(()=>w.IsArmed&&w.LatestObservation?.FramePts>0);
+    button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Until(()=>w.IsOutputActive&&w.LatestObservation?.FramePts>0);
     var observed=new List<ProgramObservation>();for(int i=0;i<4;i++){Volatile.Write(ref position,Starts[i]);Guid id=w.Editor.Rows[i].CueId;await Until(()=>w.LatestObservation?.CueId==id&&w.LatestObservation?.Monitor is{Presented:>2,Error:0});observed.Add(w.LatestObservation!);}
-    w.ConfirmStopForTest=_=>Task.FromResult(false);button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Until(()=>w.Delivery==DeliveryState.Streaming&&button.IsEnabled);Check(w.IsArmed,"cancel stopped");
-    w.ConfirmStopForTest=_=>Task.FromResult(true);button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Until(()=>!w.IsArmed&&button.IsEnabled&&!w.Surface.ProgramMode);Check(!w.FindControl<TextBlock>("PreviewInfo")!.Text!.Contains("本番映像モニター"),"monitor label left after stop");
+    w.ConfirmStopForTest=_=>Task.FromResult(false);button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Until(()=>w.Delivery==DeliveryState.Streaming&&button.IsEnabled);Check(w.IsOutputActive,"cancel stopped");
+    w.ConfirmStopForTest=_=>Task.FromResult(true);button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Until(()=>!w.IsOutputActive&&button.IsEnabled&&!w.Surface.ProgramMode);Check(!w.FindControl<TextBlock>("PreviewInfo")!.Text!.Contains("本番映像モニター"),"monitor label left after stop");
     return new{Observed=observed,Stopped=true};
    });
    await Test("restart in a black gap preserves the clock and later follows the next cue",async()=>{
     Volatile.Write(ref position,0);await Until(()=>w.LatestObservation is {CueId:null,FramePts:null,State:SyncState.LOCKED});
     var canvas=w.Surface.Canvas.SessionId;var sync=w.SynchronizationSession;var clock=w.Monitor.Clock;int starts=w.Monitor.Starts;
-    button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Until(()=>w.IsArmed&&w.Delivery==DeliveryState.Streaming);await Task.Delay(150);
+    button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Until(()=>w.IsOutputActive&&w.Delivery==DeliveryState.Streaming);await Task.Delay(150);
     Check(w.LatestObservation is {CueId:null,FramePts:null}&&w.Surface.Canvas.SessionId==canvas&&w.SynchronizationSession==sync&&ReferenceEquals(clock,w.Monitor.Clock)&&w.Monitor.Starts==starts,"output restart rewound or recreated the source");
     Check(w.Surface.Canvas.Readback().Where((b,i)=>i%4!=3).All(b=>b==0),"black gap not black");
     Volatile.Write(ref position,Starts[0]);await Until(()=>w.LatestObservation?.CueId==w.Editor.Rows[0].CueId&&w.LatestObservation.FramePts>0);
-    button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Until(()=>!w.IsArmed&&button.IsEnabled);return new{Canvas=canvas,Sync=sync,BlackGap=true,NextCue=true};
+    button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Until(()=>!w.IsOutputActive&&button.IsEnabled);return new{Canvas=canvas,Sync=sync,BlackGap=true,NextCue=true};
    });
   }finally{w.ConfirmStopForTest=null;await w.DisarmAsync();await w.Monitor.DisposeAsync();File.WriteAllText(Path.Combine(folder,"exit-code.txt"),failed?"1":"0");MainWindow.Shutdown(failed?1:0);}
  }

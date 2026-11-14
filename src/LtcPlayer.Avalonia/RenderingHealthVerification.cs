@@ -26,7 +26,7 @@ public static class RenderingHealthVerification
    });
    await Test("external output can attach and detach while preview is faulted",async()=>{
     var session=canvas.SessionId;var video=w.Preview.PlaybackSessionId;await w.ArmAsync();long before=canvas.FrameId;await Task.Delay(160);
-    Check(w.IsArmed&&canvas.OutputAttached&&canvas.FrameId>before&&w.Preview.PlaybackSessionId==video,"faulted preview blocked external output");
+    Check(w.IsOutputActive&&canvas.OutputAttached&&canvas.FrameId>before&&w.Preview.PlaybackSessionId==video,"faulted preview blocked external output");
     await w.DisarmAsync();Check(!canvas.OutputAttached&&canvas.SessionId==session&&w.SharedAudio.State==SharedAudioState.Playing,"detach changed audio/canvas");
    });
    // Explicit attachment exercises a successful preview reinitialization. Product
@@ -36,7 +36,7 @@ public static class RenderingHealthVerification
     await w.Preview.StopAsync();await w.Preview.PlayAsync();await Until(()=>w.SharedAudio.State==SharedAudioState.Playing);await w.ArmAsync();
     long before=canvas.FrameId;var video=w.Preview.PlaybackSessionId;var sink=w.SharedAudio.SinkSession;
     canvas.PreviewResultForTest=_=>unchecked((int)0x8007000E);try{canvas.UpdatePreview();}finally{canvas.PreviewResultForTest=null;}
-    await Task.Delay(200);Check(w.IsArmed&&canvas.OutputAttached&&canvas.FrameId>before&&w.Preview.PlaybackSessionId==video&&w.SharedAudio.SinkSession==sink&&w.SharedAudio.State==SharedAudioState.Playing,"local resource fault stopped external output/audio");
+    await Task.Delay(200);Check(w.IsOutputActive&&canvas.OutputAttached&&canvas.FrameId>before&&w.Preview.PlaybackSessionId==video&&w.SharedAudio.SinkSession==sink&&w.SharedAudio.State==SharedAudioState.Playing,"local resource fault stopped external output/audio");
     Check(w.FindControl<TextBlock>("PreviewInfo")!.Text!.Contains("プレビュー描画エラー"),"local fault notification overwritten");await w.DisarmAsync();
    });
    canvas.AttachPreview(w.Surface.ProgramWindowForVerification);
@@ -47,7 +47,7 @@ public static class RenderingHealthVerification
      var active=w.Surface.Canvas;var session=active.SessionId;var video=w.Preview.PlaybackSessionId;var sink=w.SharedAudio.SinkSession;
      await w.ArmAsync();long before=active.FrameId;active.SimulateDisplayChangeForTest();active.RefreshOutput();
      Check(active.OutputDisconnected,"display change was not latched");
-     await Until(()=>!w.IsArmed);await Task.Delay(180);
+     await Until(()=>!w.IsOutputActive);await Task.Delay(180);
      Check(!active.OutputAttached&&w.Surface.Canvas.SessionId==session,"display change replaced canvas or left output attached");
      Check(active.FrameId>before&&w.Preview.PlaybackSessionId==video&&w.Preview.Snapshot.State==PreviewState.Playing,"display change reset video");
      Check(w.SharedAudio.SinkSession==sink&&w.SharedAudio.State==SharedAudioState.Playing,"display change stopped audio");
@@ -59,9 +59,9 @@ public static class RenderingHealthVerification
     // a shared failure, not mistaken for an isolated swap-chain problem.
     canvas.PreviewResultForTest=_=>unchecked((int)0x80004005);canvas.DeviceReasonForTest=()=>removed;bool caught=false;
     try{canvas.UpdatePreview();}catch(SharedGraphicsException){caught=true;}finally{canvas.PreviewResultForTest=null;canvas.DeviceReasonForTest=null;}
-    await Until(()=>!w.IsArmed&&w.Preview.Snapshot.State==PreviewState.Stopped&&w.SharedAudio.State==SharedAudioState.Waiting);
+    await Until(()=>!w.IsOutputActive&&w.Preview.Snapshot.State==PreviewState.Stopped&&w.SharedAudio.State==SharedAudioState.Waiting);
     Check(caught&&canvas.SharedDeviceError==removed&&!canvas.OutputAttached&&w.Surface.Canvas.SessionId==session,"shared fault handling failed");
-    Check(w.FindControl<TextBlock>("PreviewInfo")!.Text!.Contains("共通GPU描画エラー")&&w.DeliveryBlockReason().Contains("GPU"),"shared fault scope/restart notice missing");
+    Check(w.FindControl<TextBlock>("PreviewInfo")!.Text is {} notice&&notice.Contains("GPU描画エラー")&&notice.Contains("再起動")&&w.DeliveryBlockReason().Contains("GPU"),"shared fault scope/restart notice missing");
     Check(!w.FindControl<Button>("ArmButton")!.IsEnabled&&AudioDecodeSession.ActiveDecoders==0,"fault left output action or stale audio enabled");
    });
    await Test("shared GPU failure during LTC stops once and does not auto-restart",async()=>{
@@ -71,9 +71,9 @@ public static class RenderingHealthVerification
     await Until(()=>w.Coordinator.Observation?.FramePts>0&&w.SharedAudio.State==SharedAudioState.Playing);await w.ArmAsync();
     ltcCanvas.PreviewResultForTest=_=>unchecked((int)0x80004005);try{ltcCanvas.UpdatePreview();}finally{ltcCanvas.PreviewResultForTest=null;}
     ltcCanvas.ExternalErrorForTest=_=>unchecked((int)0x887A0007);try{ltcCanvas.RefreshOutput();}catch(SharedGraphicsException){}finally{ltcCanvas.ExternalErrorForTest=null;}
-    await Until(()=>!w.IsArmed&&!w.Coordinator.OwnsSurface&&w.SharedAudio.State==SharedAudioState.Waiting);await Task.Delay(250);
+    await Until(()=>!w.IsOutputActive&&!w.Coordinator.OwnsSurface&&w.SharedAudio.State==SharedAudioState.Waiting);await Task.Delay(250);
     Check(w.SynchronizationSession==null&&ltcCanvas.SharedDeviceError<0&&!ltcCanvas.OutputAttached&&w.Monitor.Clock.Read().State!=SyncState.LOST,"failed GPU session auto-restarted or stopped input monitoring");
-    Check(w.FindControl<TextBlock>("PreviewInfo")!.Text!.Contains("共通GPU描画エラー"),"LTC failure notification overwritten");
+    Check(w.FindControl<TextBlock>("PreviewInfo")!.Text is {} notice&&notice.Contains("GPU描画エラー")&&notice.Contains("再起動"),"LTC failure notification overwritten");
    });
    await Test("legacy renderer accepts DXGI success statuses but rejects actual errors",()=>{
     var check=typeof(VideoRenderer).GetMethod("Check",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic)!;

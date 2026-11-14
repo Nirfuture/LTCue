@@ -5,9 +5,9 @@ public partial class MainWindow
  bool handlingOutputDisconnect;
  async Task HandleOutputDisconnectedAsync()
  {
-  if(handlingOutputDisconnect||!armed)return;
+  if(handlingOutputDisconnect||!outputSessionActive)return;
   handlingOutputDisconnect=true;
-  try{await DisarmAsync();StatusMessage("映像出力先の接続・表示構成が変更されたため外部映像を停止しました。設定を確認して再開してください。");}
+  try{await DisarmAsync();StatusMessage("出力先の変更・切断により出力停止");}
   finally{handlingOutputDisconnect=false;}
  }
  bool handlingGraphicsFailure;
@@ -16,9 +16,9 @@ public partial class MainWindow
  {
   var canvas=Surface.Ready?Surface.Canvas:null;
   Control<TextBlock>("PreviewInfo").Text=canvas?.SharedDeviceError is <0
-   ?$"共通GPU描画エラー（0x{canvas.SharedDeviceError:X8}）。プレビューと映像出力を継続できません。アプリを再起動してください。"
+   ?$"GPU描画エラー（0x{canvas.SharedDeviceError:X8}）。再起動してください"
    :canvas?.PreviewError is <0
-    ?$"プレビュー描画エラー（0x{canvas.PreviewError:X8}）。映像・音声出力の操作は継続できます。"
+    ?$"プレビュー描画エラー（0x{canvas.PreviewError:X8}、出力は継続）"
     :normal;
  }
  async Task HandleSharedGraphicsFailureAsync()
@@ -27,7 +27,7 @@ public partial class MainWindow
   handlingGraphicsFailure=true;handledGraphicsSession=Surface.Canvas.SessionId;
   try{
    await DisarmAsync();await StopSyncPreviewAsync();await Preview.StopAsync();
-   UpdatePreviewNotice("");StatusMessage("共通GPUの描画に失敗したため映像再生と映像出力を停止しました。アプリを再起動してください。");
+   UpdatePreviewNotice("");StatusMessage("GPU描画エラーで出力停止。再起動してください");
   }finally{handlingGraphicsFailure=false;UpdateEnabled();}
  }
 }

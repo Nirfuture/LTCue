@@ -5,8 +5,8 @@ namespace LtcPlayer.Avalonia;
 public sealed class InputPeakBar : Control
 {
  public static readonly StyledProperty<double> ValueProperty=AvaloniaProperty.Register<InputPeakBar,double>(nameof(Value));
- public static readonly StyledProperty<IBrush?> ForegroundProperty=AvaloniaProperty.Register<InputPeakBar,IBrush?>(nameof(Foreground),Brush.Parse("#55B2F6"));
- public static readonly StyledProperty<IBrush?> BackgroundProperty=AvaloniaProperty.Register<InputPeakBar,IBrush?>(nameof(Background),Brush.Parse("#303743"));
+ public static readonly StyledProperty<IBrush?> ForegroundProperty=AvaloniaProperty.Register<InputPeakBar,IBrush?>(nameof(Foreground),ThemePalette.Accent);
+ public static readonly StyledProperty<IBrush?> BackgroundProperty=AvaloniaProperty.Register<InputPeakBar,IBrush?>(nameof(Background),ThemePalette.Border);
  public double Value{get=>GetValue(ValueProperty);set=>SetValue(ValueProperty,value);}
  public IBrush? Foreground{get=>GetValue(ForegroundProperty);set=>SetValue(ForegroundProperty,value);}
  public IBrush? Background{get=>GetValue(BackgroundProperty);set=>SetValue(BackgroundProperty,value);}

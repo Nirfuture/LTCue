@@ -22,7 +22,7 @@ internal static class AudioNative
     [DllImport(Dll,CallingConvention=CallingConvention.Cdecl)] internal static extern int tc_read(nint handle,out TcFrame frame);
     [DllImport(Dll,CallingConvention=CallingConvention.Cdecl)] internal static extern int tc_generate(double fps,int drop,int h,int m,int s,int f,int frames,[Out] float[] samples,int capacity);
     [DllImport(Dll,CallingConvention=CallingConvention.Cdecl)] internal static extern int audio_convert_test(byte[] data,int byteCount,int bits,int floating,int channels,int channel,int count,[Out] float[] mono);
-    internal static void Check(int hr){if(hr<0) throw new IOException($"WASAPI失敗: 0x{hr:X8}");}
+    internal static void Check(int hr){if(hr<0) throw new IOException($"音声デバイスエラー（0x{hr:X8}）");}
 }
 public sealed class LtcDecoder : IDisposable
 {
@@ -41,25 +41,25 @@ public sealed class AudioInputService
     public static AudioDevice[] Devices()
     {
         var ds=new AudioDevice[64]; AudioNative.Check(AudioNative.audio_devices(ds,ds.Length,out int count));
-        if(count>ds.Length) throw new IOException("入力デバイス数が上限を超えています。"); return ds.Take(count).ToArray();
+        if(count>ds.Length) throw new IOException("入力デバイス数が上限超過"); return ds.Take(count).ToArray();
     }
-    public Task RunAsync(string id,int channel,TimecodeRate mode,MasterClock clock,Action<float,string> status,Action<TcFrame,double>? received,CancellationToken token)=>Task.Run(()=>
+    public Task RunAsync(string id,int channel,TimecodeRate mode,MasterClock clock,Action<float,string> status,Action<TcFrame,double>? received,CancellationToken token,Action<Exception?>? firstOpen=null)=>Task.Run(()=>
     {
-        var data=new float[65536];
+        var data=new float[65536];bool firstAttempt=true;
         while(!token.IsCancellationRequested)
         {
             nint capture=0;
             try
             {
                 AudioNative.Check(AudioNative.audio_open(id,channel,out capture,out int rate,out int channels));
-                using var decoder=new LtcDecoder(rate,mode.Fps); status(0,$"接続: {rate}Hz / {channels}ch"); bool firstPacket=true;
+                using var decoder=new LtcDecoder(rate,mode.Fps); status(0,$"接続中 · {rate}Hz / {channels}ch");if(firstAttempt){firstAttempt=false;firstOpen?.Invoke(null);} bool firstPacket=true;
                 while(!token.IsCancellationRequested)
                 {
                     AudioNative.Check(AudioNative.audio_poll(capture,data,data.Length,out int count,out ulong position,out ulong qpc,out int flags));
                     if(count==0){Thread.Sleep(4); continue;}
-                    if((flags&1)!=0 && !firstPacket) throw new IOException("音声データ不連続を検出。再接続します。");
+                    if((flags&1)!=0 && !firstPacket) throw new IOException("音声入力が途切れました。再接続中");
                     firstPacket=false;
-                    if((flags&4)!=0) throw new IOException("音声タイムスタンプが不確実です。");
+                    if((flags&4)!=0) throw new IOException("音声入力の時刻を取得できません");
                     float peak=0; for(int i=0;i<count;++i) peak=Math.Max(peak,Math.Abs(data[i])); status(peak,"入力中");
                     foreach(var tc in decoder.Feed(data,count,(long)position))
                     {
@@ -68,7 +68,7 @@ public sealed class AudioInputService
                     }
                 }
             }
-            catch(Exception e) {clock.Fault(); status(0,e.Message+" / 同じ入力IDの復帰待ち");}
+            catch(Exception e) {if(firstAttempt){firstAttempt=false;firstOpen?.Invoke(e);}clock.Fault(); status(0,e.Message+" · 入力の復帰待ち");}
             finally {if(capture!=0) AudioNative.audio_close(capture);}
             if(!token.IsCancellationRequested) token.WaitHandle.WaitOne(1000);
         }

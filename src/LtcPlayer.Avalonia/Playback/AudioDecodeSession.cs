@@ -10,15 +10,15 @@ namespace LtcPlayer.App;
 public sealed record AudioMediaInfo(string Path,string Codec,double VideoStart,double? AudioStart,double Duration,double ContainerStart=0)
 {
     public bool Supported=>Codec=="aac"||Codec.StartsWith("pcm_",StringComparison.Ordinal);
-    public string Notice=>Codec==""?"音声なし":Supported?Codec:Codec+"は音声出力対象外";
+    public string Notice=>Codec==""?"音声なし":Supported?Codec:Codec+"は音声形式非対応";
     public static async Task<AudioMediaInfo> InspectAsync(string path,CancellationToken token)
     {
-        if(!File.Exists(path))throw new FileNotFoundException("音声素材が見つかりません。",path);
+        if(!File.Exists(path))throw new FileNotFoundException("音声ファイルなし",path);
         using var timeout=CancellationTokenSource.CreateLinkedTokenSource(token);timeout.CancelAfter(TimeSpan.FromSeconds(15));
         using var p=MediaDecoder.Start("ffprobe",["-v","error","-show_entries","stream=codec_type,codec_name,start_time,duration:format=start_time,duration","-of","json",path]);
         using var registration=timeout.Token.Register(()=>MediaDecoder.Kill(p));
         var output=p.StandardOutput.ReadToEndAsync();var errors=p.StandardError.ReadToEndAsync();await p.WaitForExitAsync(timeout.Token);
-        var detail=await errors;if(p.ExitCode!=0)throw new InvalidDataException("音声解析失敗: "+detail);
+        var detail=await errors;if(p.ExitCode!=0)throw new InvalidDataException("音声情報の取得失敗："+detail);
         using var doc=JsonDocument.Parse(await output);
         JsonElement? video=null,audio=null;
         foreach(var stream in doc.RootElement.GetProperty("streams").EnumerateArray())
@@ -26,11 +26,11 @@ public sealed record AudioMediaInfo(string Path,string Codec,double VideoStart,d
             if(stream.GetProperty("codec_type").GetString()=="video"&&video==null)video=stream;
             if(stream.GetProperty("codec_type").GetString()=="audio"&&audio==null)audio=stream;
         }
-        if(video==null)throw new InvalidDataException("映像ストリームがありません。");
+        if(video==null)throw new InvalidDataException("映像トラックなし");
         static double? Number(JsonElement element,string key)=>element.TryGetProperty(key,out var v)&&double.TryParse(v.GetString(),NumberStyles.Float,CultureInfo.InvariantCulture,out double n)&&double.IsFinite(n)?n:null;
         var format=doc.RootElement.GetProperty("format");double start=Number(video.Value,"start_time")??Number(format,"start_time")??0;
         double duration=Number(video.Value,"duration")??Number(format,"duration")??0;
-        if(duration<=0)throw new InvalidDataException("動画の長さを取得できません。");
+        if(duration<=0)throw new InvalidDataException("再生時間を取得できません");
         return new(System.IO.Path.GetFullPath(path),audio?.GetProperty("codec_name").GetString()??"",start,audio is {} a?Number(a,"start_time"):null,duration,Number(format,"start_time")??0);
     }
 }
@@ -65,7 +65,7 @@ public sealed class AudioDecodeSession : IAsyncDisposable
                     if(!ready.Task.IsCompleted){PreparationSeconds=MasterClock.Timestamp()-began;ready.TrySetResult();}
                     await blocks.Writer.WriteAsync(block,cancel.Token);
                 }
-                blocks.Writer.TryComplete();ready.TrySetException(new InvalidDataException("音声フレームがありません。"));
+                blocks.Writer.TryComplete();ready.TrySetException(new InvalidDataException("音声フレームなし"));
             }
             catch(OperationCanceledException)when(cancel.IsCancellationRequested){blocks.Writer.TryComplete();ready.TrySetCanceled(cancel.Token);}
             catch(Exception e){blocks.Writer.TryComplete(e);ready.TrySetException(e);}
@@ -105,7 +105,7 @@ public sealed class AudioDecodeSession : IAsyncDisposable
                     if(line.Contains("ashowinfo")&&Regex.Match(line,@"\bpts:(-?\d+).+\bnb_samples:(\d+)") is {Success:true} match)
                     {
                         long pts=long.Parse(match.Groups[1].Value,CultureInfo.InvariantCulture);int frames=int.Parse(match.Groups[2].Value,CultureInfo.InvariantCulture);
-                        if(pts<0||frames<1||frames>65536)throw new InvalidDataException("音声PTSまたはブロック長が不正です。");
+                        if(pts<0||frames<1||frames>65536)throw new InvalidDataException("音声データ不正");
                         await stamps.Writer.WriteAsync((pts,frames),local.Token);
                     }
                     else{if(errors.Length>16000)errors.Remove(0,8000);errors.AppendLine(line);}
@@ -122,14 +122,14 @@ public sealed class AudioDecodeSession : IAsyncDisposable
                 using var frameTimeout=CancellationTokenSource.CreateLinkedTokenSource(local.Token);frameTimeout.CancelAfter(TimeSpan.FromSeconds(15));
                 if(!await stamps.Reader.WaitToReadAsync(frameTimeout.Token))break;
                 if(!stamps.Reader.TryRead(out var stamp))continue;
-                if(Math.Abs(stamp.Pts-expected)>1)throw new InvalidDataException("音声PTSが不連続です。");
+                if(Math.Abs(stamp.Pts-expected)>1)throw new InvalidDataException("音声時刻の不連続");
                 var bytes=new byte[checked(stamp.Frames*8)];await p.StandardOutput.BaseStream.ReadExactlyAsync(bytes,frameTimeout.Token);
                 StartupMeasurementTrace.Once("audio_first_pcm",seek+stamp.Pts/48000.0);
                 var samples=new float[stamp.Frames*2];Buffer.BlockCopy(bytes,0,samples,0,bytes.Length);
                 yield return new(cueId,generation,seek+stamp.Pts/48000.0,samples);expected=stamp.Pts+stamp.Frames;
             }
             await p.WaitForExitAsync(local.Token).WaitAsync(TimeSpan.FromSeconds(15),local.Token);await stderr;
-            if(p.ExitCode!=0)throw new IOException("FFmpeg音声復号失敗: "+errors);
+            if(p.ExitCode!=0)throw new IOException("音声の復号失敗："+errors);
         }
         finally{local.Cancel();MediaDecoder.Kill(p);try{await stderr;}catch(OperationCanceledException){}Interlocked.Decrement(ref active);}
     }

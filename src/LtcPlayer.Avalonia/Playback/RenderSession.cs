@@ -19,6 +19,7 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
     public int PreviewError { get; private set; }
     public int SharedDeviceError { get; private set; }
 #if VERIFICATION
+    internal Action<CoverImage?>? CoverPrepareForTest{get;set;}
     internal Func<int,int>? PreviewResultForTest { get; set; }
     internal Func<int>? DeviceReasonForTest { get; set; }
     internal Func<int,int>? ExternalErrorForTest { get; set; }
@@ -40,7 +41,7 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
         Access(); CheckSharedDevice(); OutputPresentation.Validate(mode);
         Check(N.canvas_attach(handle, ref display, mode == OutputPresentationMode.Compatibility ? 1 : 0, probe ? 1 : 0));
         int actual=N.output_presentation_mode(handle);
-        if(actual!=(int)mode){N.canvas_detach(handle);throw new IOException("実際の出力方式が設定と一致しません。");}
+        if(actual!=(int)mode){N.canvas_detach(handle);throw new IOException("出力方式が設定と不一致");}
         OutputMode=(OutputPresentationMode)actual;OutputAttached=true;OutputDisconnected=false;
     }
     public void DetachOutput()
@@ -55,6 +56,23 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
         else Check(N.output_hap(handle, frame.Pixels, frame.Pixels.Length, frame.Width, frame.Height, frame.TextureFormat));
         FrameId++; CompositionId++; FramePts = frame.Seconds;
         UpdatePreview();
+    }
+    internal PreparedCover PrepareCover(CoverImage? image)
+    {
+        Access();CheckSharedDevice();
+        try{
+#if VERIFICATION
+            CoverPrepareForTest?.Invoke(image);
+#endif
+            return new(this,CoverNative.Prepare(handle,image));
+        }catch(IOException){CheckDevice(0);throw;}
+    }
+    internal sealed class PreparedCover(RenderSession owner,nint resource):IDisposable
+    {
+        bool committed;
+        internal void Validate(){owner.Access();owner.CheckSharedDevice();if(resource==0||committed)throw new InvalidOperationException("蓋絵の準備結果が無効です");}
+        public void Commit(){Validate();CoverNative.Commit(owner.handle,resource);committed=true;}
+        public void Dispose(){if(resource==0)return;if(Environment.CurrentManagedThreadId!=owner.thread)throw new InvalidOperationException("Render session thread mismatch");CoverNative.Free(resource);resource=0;}
     }
     public void SetCover(CoverImage? image) { Access();CheckSharedDevice();try{CoverNative.Image(handle,image);}catch(IOException){CheckDevice(0);throw;} }
     public void SetCoverMix(float amount) { Access();CheckSharedDevice();try{CoverNative.Mix(handle,amount);}catch(IOException){CheckDevice(0);throw;} }
@@ -87,7 +105,7 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
         error=ExternalErrorForTest?.Invoke(error)??error;
 #endif
         if(error==unchecked((int)0x8007048F)){OutputDisconnected=true;return;}
-        if(error<0){CheckDevice(error);throw new IOException($"外部出力エラー: 0x{error:X8}");}
+        if(error<0){CheckDevice(error);throw new IOException($"映像出力エラー（0x{error:X8}）");}
         int hr=N.canvas_output_refresh(handle);
         if(hr==unchecked((int)0x887A000A))return; // DXGI_ERROR_WAS_STILL_DRAWING: keep latest image.
         if(hr==unchecked((int)0x8007048F)){OutputDisconnected=true;return;}
@@ -139,7 +157,7 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
     }
 }
 
-public sealed class SharedGraphicsException(int code) : IOException($"共通GPUの描画を継続できません（0x{code:X8}）。アプリを再起動してください。")
+public sealed class SharedGraphicsException(int code) : IOException($"GPU描画エラー（0x{code:X8}）。再起動してください")
 {
  public int ErrorCode{get;}=code;
 }

@@ -6,12 +6,12 @@ Windows 11 x64に対応しています。以下の導入が必要です。
 
 #### Visual C++ v14 x64ランタイム
 
-1. [Visual C++ v14 x64ランタイム](https://learn.microsoft.com/ja-jp/cpp/windows/latest-supported-vc-redist#latest-supported-redistributable-version)（サポートされている最新の再頒布可能パッケージ バージョン・x64）をダウンロードします
+1. [Visual C++ v14ランタイムの配布ページ](https://learn.microsoft.com/ja-jp/cpp/windows/latest-supported-vc-redist#latest-supported-redistributable-version)を開き、「サポートされている最新の再頒布可能パッケージ バージョン」の表から **X64**（`vc_redist.x64.exe`）をダウンロードします。
 2. インストーラーを実行します。
 
 #### FFmpeg・ffprobe
 
-1. [FFmpeg・ffprobeのWindows用ビルド](https://www.gyan.dev/ffmpeg/builds/)を取得し、展開します。
+1. [FFmpeg・ffprobeの配布ページ](https://www.gyan.dev/ffmpeg/builds/)を開き、**release builds** にある **`ffmpeg-release-essentials.zip`** をダウンロードして展開します。
 2. `ffmpeg.exe`と`ffprobe.exe`が入った`bin`フォルダーを開き、アドレスバーのパスをコピーします。
 3. Windowsの検索で「環境変数」と入力し、「環境変数を編集」を開きます。
 4. ユーザー環境変数の「Path」を選び、「編集」→「新規」の順に押します。コピーしたパスを追加し、「OK」で閉じます。
@@ -25,11 +25,9 @@ ffprobe -version
 
 すでにLTCueが起動している場合は、終了して起動し直します。
 
-</details>
-
 ## 起動
 
-[LTCue 0.1.0-preview.11（Windows x64）をダウンロード](https://github.com/Nirfuture/LTCue/releases/download/v0.1.0-preview.11/LTCue-0.1.0-preview.11-win-x64.zip)
+[LTCue 0.1.0（Windows x64）をダウンロード](https://github.com/Nirfuture/LTCue/releases/download/v0.1.0/LTCue-0.1.0-win-x64.zip)
 
 
 ZIPをすべて展開し、直下の`LTCue.exe`を起動します。
@@ -82,7 +80,7 @@ LTC入力機器をPCに接続し、画面右上の設定アイコンから「LTC
 
 <a href="images/quickstart-output-start.png"><img src="images/quickstart-output-start.png" alt="画面右上の③出力開始ボタン。" width="400"></a>
 
-「出力停止」で外部ディスプレイへの出力を停止します。確認画面で「出力を停止」を選びます。外部映像を停止しても、アプリ内の映像・音声の再生は継続します。
+「出力停止」で外部ディスプレイへの出力を停止します。確認画面で「停止する」を選びます。外部映像を停止しても、アプリ内の映像・音声の再生は継続します。
 
 ## 蓋絵
 

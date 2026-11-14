@@ -54,7 +54,7 @@ public sealed class AudioOutputSink : IDisposable
     public static OutputAudioDevice[] Devices()
     {
         var data=new OutputAudioDevice[128];Check(N.pa_devices(data,data.Length,out int count));
-        if(count<0||count>data.Length)throw new IOException("音声出力デバイス数が上限を超えています。");
+        if(count<0||count>data.Length)throw new IOException("音声出力デバイス数が上限超過");
         return data.Take(count).ToArray();
     }
     void Access()

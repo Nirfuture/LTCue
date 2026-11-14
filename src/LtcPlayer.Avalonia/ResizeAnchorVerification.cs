@@ -23,8 +23,9 @@ public static class ResizeAnchorVerification
      if(state=="invalid-timecode")w.Editor.Rows[0].Hours="99";
      await Task.Delay(140);
      double listDelta=list.TranslatePoint(default,w)!.Value.Y-listTop,previewDelta=preview.TranslatePoint(default,w)!.Value.Y-previewTop,heightDelta=scroll.Viewport.Height-viewportHeight;
-     bool expectedVisible=state!="restored";
-     bool passed=Math.Abs(listDelta)<.5&&Math.Abs(previewDelta)<.5&&Math.Abs(heightDelta)<.5&&hint.IsVisible==expectedVisible;
+     bool expectedVisible=false;
+     bool rowState=state is "conflict" or "invalid-timecode"?w.Editor.Rows.Any(r=>r.Error!=""):w.Editor.Rows.All(r=>r.Error=="");
+     bool passed=Math.Abs(listDelta)<.5&&Math.Abs(previewDelta)<.5&&Math.Abs(heightDelta)<.5&&hint.IsVisible==expectedVisible&&rowState;
      warningSamples.Add(new{size.Width,size.Height,State=state,ListDelta=listDelta,PreviewDelta=previewDelta,ViewportHeightDelta=heightDelta,Warning=hint.Text,Visible=hint.IsVisible,Passed=passed});
      if(!passed)failed=true;
     }

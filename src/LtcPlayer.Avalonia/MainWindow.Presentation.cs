@@ -8,6 +8,22 @@ namespace LtcPlayer.Avalonia;
 public partial class MainWindow
 {
  readonly CoverController cover=new();
+ MaterialMonitor? materials;
+ void StartMaterialMonitor(){
+  materials=new MaterialMonitor(
+   async()=>await Dispatcher.UIThread.InvokeAsync(()=>closing?Array.Empty<MaterialRequest>():Editor.Rows.Select(r=>new MaterialRequest(r.CueId,r.FilePath,r.SourceRevision,r.Duration>0,r.SourceError!="",r.MaterialStatusRevision)).ToArray()),
+   async results=>await Dispatcher.UIThread.InvokeAsync(()=>{
+    if(closing)return;bool changed=false;
+    foreach(var result in results){
+     var row=Editor.Rows.FirstOrDefault(r=>r.CueId==result.Request.Id&&r.FilePath==result.Request.Path&&r.SourceRevision==result.Request.Revision&&r.MaterialStatusRevision==result.Request.StatusRevision);
+     if(row==null)continue;
+     if(result.Info is {} info)row.AcceptMedia(info);else{Preview.IndexCache.Invalidate(row.FilePath);row.SourceError=result.Error;}
+     changed=true;
+    }
+    if(changed)Editor.Validate();
+   }),()=>Preview.IsBusy||playback.Audio.State is SharedAudioState.Preparing or SharedAudioState.Resyncing,()=>new MediaDecoder(reuseAnalysis:true,indexCache:Preview.IndexCache));
+ }
+
  readonly DispatcherTimer coverTimer=new(){Interval=TimeSpan.FromMilliseconds(16)};
  int programRevision;bool presentationReady;string coverLoadWarning="";
  internal PlaybackCoordinator Coordinator=>playback;
@@ -18,39 +34,26 @@ public partial class MainWindow
  internal CoverController Cover=>cover;
  void InitializePresentation(){
   Surface.Cover=cover;
+  playback.AudioMaterialFailed+=(source,error)=>Dispatcher.UIThread.Post(()=>{
+   if(closing)return;
+   var current=playback.ReadAudioPlayhead();
+   if(current.SessionId!=source.SessionId||current.CueId!=source.CueId||current.Generation!=source.Generation||current.SourceRevision!=source.SourceRevision)return;
+   foreach(var row in Editor.Rows.Where(r=>r.FilePath==source.Path&&(r.SourceRevision==source.SourceRevision||source.SourceRevision==0)))row.AudioIssue=error;
+  });
+  playback.MaterialFailed+=failure=>Dispatcher.UIThread.Post(()=>{
+   if(closing||failure.SessionId!=playback.SynchronizationSession||!Editor.Rows.Any(r=>r.CueId==failure.Cue.CueId&&r.FilePath==failure.Cue.FilePath&&r.SourceRevision==failure.Cue.SourceRevision))return;
+   foreach(var row in Editor.Rows.Where(r=>r.FilePath==failure.Cue.FilePath))row.SourceError=failure.Reason;
+   Editor.Validate();
+  });
   Editor.PlaybackChanged+=()=>programRevision++;
-  coverTimer.Tick+=(_,_)=>{if(presentationReady&&!closing)try{Surface.RefreshCover();if(armed&&Surface.Canvas.PollStopRequest())_ = Safe(async()=>{await RequestStopAsync(false);});}catch(Exception e){if(Surface.Ready&&Surface.Canvas.SharedDeviceError<0)_ = Safe(HandleSharedGraphicsFailureAsync);else _ = Safe(async()=>{if(armed)await DisarmAsync();StatusMessage(e.Message);});}UpdateCoverLabel();};
+  coverTimer.Tick+=(_,_)=>{if(presentationReady&&!closing)try{Surface.RefreshCover();if(outputSessionActive&&Surface.Canvas.PollStopRequest())_ = Safe(async()=>{await RequestStopAsync(false);});}catch(Exception e){if(Surface.Ready&&Surface.Canvas.SharedDeviceError<0)_ = Safe(HandleSharedGraphicsFailureAsync);else _ = Safe(async()=>{if(outputSessionActive)await DisarmAsync();StatusMessage(e.Message);});}UpdateCoverLabel();};
   Control<NumericUpDown>("FadeSeconds").ValueChanged+=(_,_)=>{if(!presentationReady||applyingSettings)return;var value=Control<NumericUpDown>("FadeSeconds").Value;if(value is {} seconds){settings=settings with{FadeSeconds=(double)seconds};try{SaveSettings();}catch(Exception e){StatusMessage(e.Message);}}};
   coverTimer.Start();
  }
  async Task LoadPresentationSettingsAsync(){
   var display=selectedDisplay;Surface.ConfigureCanvas(display?.Width??1920,display?.Height??1080);UpdateResponsiveLayout();
-  try{cover.Image=await CoverImageLoader.LoadAsync(settings.CoverPath);}catch(Exception e){cover.Image=null;coverLoadWarning=e.Message;StatusMessage("蓋画を読み込めません。黒を使用します："+e.Message);}
+  try{cover.Image=await CoverImageLoader.LoadAsync(settings.CoverPath);}catch(Exception e){cover.Image=null;coverLoadWarning=e.Message;StatusMessage("蓋絵の読込失敗（黒で表示）："+e.Message);}
   Control<NumericUpDown>("FadeSeconds").Value=(decimal)settings.FadeSeconds;
- }
- bool choosingCover;
- bool CanChangeCover=>presentationReady&&!armed&&!busy&&!closing&&!closePending&&!choosingCover;
- async void ChooseCoverClick(object? sender,RoutedEventArgs e){
-  if(!CanChangeCover)return;
-  choosingCover=true;UpdateCoverLabel();
-  try{
-   var files=await StorageProvider.OpenFilePickerAsync(new(){Title="蓋画を登録",AllowMultiple=false,FileTypeFilter=[new("PNG・JPEG"){Patterns=["*.png","*.jpg","*.jpeg"]}]});
-   if(files.FirstOrDefault()?.TryGetLocalPath() is not {} path)return;
-   var image=await CoverImageLoader.LoadAsync(path);
-   if(armed||busy||closing||closePending)return;
-   SaveCover(path,image);StatusMessage("蓋画を登録しました。");
-  }catch(Exception ex){StatusMessage(ex.Message);}
-  finally{choosingCover=false;UpdateCoverLabel();}
- }
- void ClearCoverClick(object? sender,RoutedEventArgs e){
-  if(!CanChangeCover)return;
-  try{SaveCover("",null);StatusMessage("蓋画を解除しました。黒を使用します。");}
-  catch(Exception ex){StatusMessage(ex.Message);}
- }
- void SaveCover(string path,CoverImage? image){
-  var previous=settings;settings=settings with{CoverPath=path};
-  try{SaveSettings();}catch{settings=previous;throw;}
-  cover.Image=image;coverLoadWarning="";UpdateCoverLabel();
  }
  internal void SetCoverVisible(bool value){cover.Set(value,settings.FadeSeconds);UpdateCoverLabel();}
  internal void SetFadeSeconds(decimal seconds){Control<NumericUpDown>("FadeSeconds").Value=Math.Clamp(seconds,0,60);}
@@ -59,21 +62,25 @@ public partial class MainWindow
  void CoverClick(object? sender,RoutedEventArgs e)=>SetCoverVisible(Control<ToggleButton>("CoverButton").IsChecked==true);
  void UpdateCoverLabel(){
   var button=Control<ToggleButton>("CoverButton");button.IsChecked=cover.IsCovered;
-  Control<TextBlock>("CoverActionLabel").Text=cover.IsCovered?"映像に戻す":"蓋絵を表示";
-  var name=Control<TextBlock>("CoverName");name.Text=settings.CoverPath==""?"未登録（黒）":Path.GetFileName(settings.CoverPath);ToolTip.SetTip(name,coverLoadWarning!=""?coverLoadWarning:settings.CoverPath);
+  Control<TextBlock>("CoverActionLabel").Text=cover.IsCovered?"非表示":"表示";
+  var name=Control<TextBlock>("CoverName");name.Text=settings.CoverPath==""?"画像なし":Path.GetFileName(settings.CoverPath);ToolTip.SetTip(name,coverLoadWarning!=""?coverLoadWarning:settings.CoverPath);
   Control<Button>("ChooseCoverButton").IsEnabled=CanChangeCover;
   Control<Button>("ClearCoverButton").IsEnabled=CanChangeCover&&settings.CoverPath!="";
-  Control<TextBlock>("CoverStatus").Text=cover.Transitioning?(cover.IsCovered?"蓋画へフェード中":"映像へフェード中"):cover.IsCovered?(cover.Image==null?"蓋画表示中（黒）":"蓋画表示中"):"映像表示中";
-  ToolTip.SetTip(button,cover.Image==null?(coverLoadWarning!=""?"画像を読み込めないため黒を使用します："+coverLoadWarning:"未登録のため黒へ切り替えます"):cover.Image.Path);
+  ToolTip.SetTip(Control<Button>("ChooseCoverButton"),CanChangeCover?"蓋絵を変更":CoverChangeAccess.Reason);
+  ToolTip.SetTip(Control<Button>("ClearCoverButton"),CanChangeCover?"蓋絵を解除":CoverChangeAccess.Reason);
+  ToolTip.SetTip(button,cover.Image==null?(coverLoadWarning!=""?"蓋絵の読込失敗（黒で表示）："+coverLoadWarning:"画像未登録：黒で表示"):cover.Image.Path);
  }
- void OnPlaybackFailed(Exception e){if(Surface.Ready&&Surface.Canvas.SharedDeviceError<0)_ = Safe(HandleSharedGraphicsFailureAsync);else _ = Safe(async()=>{if(armed)await DisarmAsync();StatusMessage("同期再生エラー："+e.Message);});}
+ void OnPlaybackFailed(Exception e){if(Surface.Ready&&Surface.Canvas.SharedDeviceError<0)_ = Safe(HandleSharedGraphicsFailureAsync);else _ = Safe(async()=>{if(outputSessionActive)await DisarmAsync();StatusMessage("同期再生エラー："+e.Message);});}
  async Task UpdateAutoPreviewAsync(){
   if(!presentationReady||closing||closePending||busy||!Surface.Ready||Surface.Canvas.SharedDeviceError<0||MasterClock.Timestamp()<playback.RetryAt)return;
   try{
    var size=Surface.CanvasSize;
-   await playback.ReconcileAsync(programRevision,Editor.CanArm,()=>ShowProgramService.Validate(Editor.Rows,Editor.Rate),new OutputDisplay{Width=size.Width,Height=size.Height},Editor.Rate.FramesToSeconds(settings.Offset));
+   await playback.ReconcileAsync(programRevision,Editor.CanArm,()=>Editor.Timeline.ToList(),new OutputDisplay{Width=size.Width,Height=size.Height},Editor.Rate.FramesToSeconds(settings.Offset));
    UpdateEnabled();
-  }catch(Exception e){playback.DeferRetry();StatusMessage("同期プレビュー："+e.Message);await StopSyncPreviewAsync();}
+  }catch(Exception e){playback.DeferRetry();StatusMessage("同期エラー："+e.Message);await StopSyncPreviewAsync();}
  }
+#if VERIFICATION
+ internal Task StopSynchronizationForTest()=>StopSyncPreviewAsync();
+#endif
  internal async Task StopSyncPreviewAsync(){await playback.StopSynchronizationAsync();Control<TextBlock>("RunInfo").Text="";UpdateEnabled();}
 }

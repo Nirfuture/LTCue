@@ -53,7 +53,7 @@ public static class PreviewPerformanceVerification
     await window.Preview.SeekAsync(1);Check(window.Preview.Snapshot.State==PreviewState.Paused,"Seek state wrong");
     await window.Preview.PlayAsync();await Task.Delay(200);
     Check(window.Preview.Snapshot.Position>=1,"Seek/resume did not advance");
-    await window.Preview.StopAsync();Check(window.Preview.Snapshot.State==PreviewState.Stopped&&window.Preview.Snapshot.Position>=1,"Stop did not hold");
+    await window.Preview.StopAsync();Check(window.Preview.Snapshot.State==PreviewState.Stopped&&window.Preview.Snapshot.Position==0&&window.Preview.Snapshot.FramePts<.05,"Stop did not return first frame");
     await window.Preview.PlayAsync();await Task.Delay(100);
     Check(window.Preview.Snapshot.Position>0&&window.Preview.Snapshot.Position<1,"Replay did not start at zero");
     await window.Preview.StopAsync();

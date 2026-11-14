@@ -28,7 +28,7 @@ public partial class MainWindow
   if(!audioUiReady)return;var s=SharedAudio;
   Control<global::Avalonia.Controls.Primitives.ToggleButton>("AudioEnabled").IsChecked=audioRequested;Control<global::Avalonia.Controls.Primitives.ToggleButton>("AudioEnabled").IsEnabled=!audioChanging&&!closing;
   Control<LucideIcon>("AudioPowerIcon").Kind=audioRequested?"volume-2":"volume-x";
-  var action=audioRequested?"音声出力を停止":"音声出力を開始";ToolTip.SetTip(Control<global::Avalonia.Controls.Primitives.ToggleButton>("AudioEnabled"),action);global::Avalonia.Automation.AutomationProperties.SetName(Control<global::Avalonia.Controls.Primitives.ToggleButton>("AudioEnabled"),action);
+  var action=audioRequested?"音声OFF":"音声ON";ToolTip.SetTip(Control<global::Avalonia.Controls.Primitives.ToggleButton>("AudioEnabled"),action);global::Avalonia.Automation.AutomationProperties.SetName(Control<global::Avalonia.Controls.Primitives.ToggleButton>("AudioEnabled"),action);
   ToolTip.SetTip(Control<global::Avalonia.Controls.Primitives.ToggleButton>("AudioEnabled"),action+(s.Notice==""?"":"\n"+s.Notice));
   Control<TextBlock>("VolumePercent").Text=$"{Control<Slider>("Volume").Value:P0}";
  }

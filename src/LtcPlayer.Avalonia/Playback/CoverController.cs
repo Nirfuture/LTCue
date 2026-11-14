@@ -20,6 +20,7 @@ public interface ICoverRenderer
 public sealed class CoverBinding
 {
  CoverImage? image;bool initialized;float amount=-1;
+ public void AcceptImage(CoverImage? value){image=value;initialized=true;}
  public bool Apply(CoverController controller,ICoverRenderer renderer){
   bool changed=false;var next=controller.Image;if(!initialized||!ReferenceEquals(next,image)){renderer.SetCover(next);image=next;initialized=true;changed=true;}
   float mix=(float)controller.Amount();if(amount!=mix){renderer.SetCoverMix(mix);amount=mix;changed=true;}return changed;

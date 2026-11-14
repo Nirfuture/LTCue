@@ -18,18 +18,18 @@ public static class Phase5Verification
   {
    try{results.Add(new{test=name,status="PASS",detail=await action()});}
    catch(Exception e){failed=true;results.Add(new{test=name,status="FAIL",detail=e.ToString()});}
-   finally{await window.DisarmAsync();await window.StopSyncPreviewAsync();await window.Monitor.ConfigureAsync(new());await player.SetArmedAsync(false);await player.StopAsync();}
+   finally{await window.DisarmAsync();await window.StopSyncPreviewAsync();await window.Monitor.ConfigureAsync(new());await player.SetSyncOwnershipAsync(false);await player.StopAsync();}
    await File.WriteAllTextAsync(Path.Combine(folder,"results.json"),JsonSerializer.Serialize(results,new JsonSerializerOptions{WriteIndented=true}));
   }
   try {
    await Test("Avalonia editor import/clone/TC conflict/reorder/JSON",async()=>{
-    var editor=new ShowEditor();await editor.ImportAsync([aac,pcm,silent],"00:00:00:00");Assert(!editor.CanArm,"same TC must conflict");
+    var editor=new ShowEditor();await editor.ImportAsync([aac,pcm,silent],"00:00:00:00");Assert(editor.Timeline.Length==0&&editor.Rows.All(r=>r.Error.Contains("重複")),"same TC must exclude all");
     editor.Rows[1].Seconds="02";editor.Rows[2].Seconds="03";editor.Validate();Assert(editor.CanArm,"distinct TC should ARM");
     var a=editor.Rows[0];var clone=editor.Clone(a);Assert(!clone.Enabled&&clone.CueId!=a.CueId,"disabled clone");
     var before=new CueScheduler(ShowProgramService.Validate(editor.Rows,editor.Rate));editor.Move(a,3);
     var after=new CueScheduler(ShowProgramService.Validate(editor.Rows,editor.Rate));foreach(double t in new[]{0.5,2.5,3.5,5.5})Assert(before.Select(t)?.CueId==after.Select(t)?.CueId,"reorder changed schedule");
     var ids=editor.Rows.Select(r=>r.CueId).ToArray();string json=Path.Combine(folder,"editor-show.json");await editor.SaveAsync(json);int notifications=0;editor.Changed+=()=>notifications++;await editor.LoadAsync(json);Assert(notifications==1,"bulk load repeated validation notifications");Assert(ids.SequenceEqual(editor.Rows.Select(r=>r.CueId)),"JSON identity/order");
-    editor.Locked=true;bool rejected=false;try{editor.Delete(editor.Rows[0]);}catch(InvalidOperationException){rejected=true;}Assert(rejected,"locked editor allows delete");
+    editor.DefinitionAuthority=()=>false;bool rejected=false;try{editor.Delete(editor.Rows[0]);}catch(InvalidOperationException){rejected=true;}Assert(rejected,"locked editor allows delete");
     return new{Rows=editor.Rows.Count,ReorderedWithoutScheduleChange=true,LockedMutationRejected=rejected};
    });
    await Test("AAC playback/audio clock/pause/resume",async()=>{
@@ -62,11 +62,11 @@ public static class Phase5Verification
    });
    await Test("unsupported preview audio is explicit video-only",async()=>{
     await player.LoadAsync(Path.Combine(fixtures,"h264-mp3.mp4"));await player.PlayAsync();await Until(()=>player.Snapshot.Position>.2);
-    Assert(player.Snapshot.Audio==null&&player.Snapshot.Notice.Contains("対象外"),"unsupported audio was not explicit");return player.Snapshot;
+    Assert(player.Snapshot.Audio==null&&player.Snapshot.Notice.Contains("非対応"),"unsupported audio was not explicit");return player.Snapshot;
    });
    await Test("stop holds frame and closes audio resources",async()=>{
     await player.LoadAsync(aac);await player.PlayAsync();await Until(()=>player.Snapshot.Position>.2);await player.StopAsync();
-    var pixels=window.Surface.Readback();Assert(pixels.Where((_,i)=>i%4!=3).Any(x=>x>0),"stop lost held image");Assert(player.Snapshot.Position>0&&player.Snapshot.State==PreviewState.Stopped&&PreviewAudio.ActiveStreams==0,"stop leaked audio or position");
+    var pixels=window.Surface.Readback();Assert(pixels.Where((_,i)=>i%4!=3).Any(x=>x>0),"stop lost held image");Assert(player.Snapshot.Position==0&&player.Snapshot.FramePts<.05&&player.Snapshot.State==PreviewState.Stopped&&PreviewAudio.ActiveStreams==0,"stop leaked audio or position");
     return new{player.Snapshot,ActiveAudioStreams=PreviewAudio.ActiveStreams,Holding=true};
    });
    await Test("playing resize preserves audio/video session",async()=>{
@@ -85,16 +85,16 @@ public static class Phase5Verification
     await player.LoadAsync(aac);await player.PlayAsync();await Until(()=>player.Snapshot.Position>.2);
     await window.ArmAsync(async(clock,token)=>{int i=0;while(!token.IsCancellationRequested){clock.Accept(new TcFrame{Seconds=(i/25)%60,Frame=i%25},MasterClock.Timestamp());i++;await Task.Delay(40,token);}});
     try {
-     await Until(()=>player.Armed&&window.LatestObservation is {FramePts:>0});Assert(window.IsArmed&&player.Armed&&PreviewAudio.ActiveStreams==0,"ARM did not terminate preview audio");
+     await Until(()=>player.IsSyncOwned&&window.LatestObservation is {FramePts:>0});Assert(window.IsOutputActive&&player.IsSyncOwned&&PreviewAudio.ActiveStreams==0,"ARM did not terminate preview audio");
      int blocked=0;foreach(var action in new Func<Task>[]{player.PlayAsync,()=>player.LoadAsync(pcm),()=>player.SeekAsync(1)})try{await action();}catch(InvalidOperationException){blocked++;}
-     Assert(blocked==3,"preview command bypassed ARM");await Until(()=>window.LatestObservation is {Presented:>5,FramePts:>0});Assert(window.IsArmed,"production unexpectedly stopped");return new{BlockedCommands=blocked,AudioStreams=PreviewAudio.ActiveStreams,SyntheticInput=true,Observation=window.LatestObservation};
+     Assert(blocked==3,"preview command bypassed ARM");await Until(()=>window.LatestObservation is {Presented:>5,FramePts:>0});Assert(window.IsOutputActive,"production unexpectedly stopped");return new{BlockedCommands=blocked,AudioStreams=PreviewAudio.ActiveStreams,SyntheticInput=true,Observation=window.LatestObservation};
     }finally{await window.DisarmAsync();}
    });
    await Test("stop during ARM preparation prevents late startup",async()=>{
     var prepare=window.ArmAsync(async(clock,token)=>await Task.Delay(Timeout.Infinite,token));
     await Task.Delay(1);await window.DisarmAsync();bool cancelled=false;try{await prepare;}catch(OperationCanceledException){cancelled=true;}
-    Assert(!window.IsArmed&&!player.Armed&&PreviewAudio.ActiveStreams==0,"late ARM startup or preview lock retained");
-    return new{PreparationCancelled=cancelled,window.IsArmed,player.Armed};
+    Assert(!window.IsOutputActive&&!player.IsSyncOwned&&PreviewAudio.ActiveStreams==0,"late ARM startup or preview lock retained");
+    return new{PreparationCancelled=cancelled,window.IsOutputActive,player.IsSyncOwned};
    });
    if(Program.Arguments.Contains("--regression")) {
     var adapter=new RegressionWindow();

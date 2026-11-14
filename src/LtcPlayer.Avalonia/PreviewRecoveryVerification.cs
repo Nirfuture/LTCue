@@ -48,7 +48,7 @@ public static class PreviewRecoveryVerification
      if(Program.Arguments.Contains("--visual-hold"))await Task.Delay(15000);
      Check(w.LatestObservation!.Monitor!.Error==0&&canvas.SessionId==canvasId&&src.SequenceEqual(canvas.Readback()),"monitor restore failed or changed composition");
      Volatile.Write(ref receiving,1);await Until(()=>w.LatestObservation!.Presented>production+5&&w.LatestObservation.State!=SyncState.LOST);Stage("resumed");await Task.Delay(500);
-     var resumed=w.LatestObservation;w.ConfirmStopForTest=_=>Task.FromResult(true);await w.RequestStopAsync(false);Check(!w.IsArmed&&!w.Surface.ProgramMode&&w.Surface.Canvas.SessionId==canvasId&&w.SynchronizationSession==sync,"stop changed shared canvas or LTC source");return new{Before=before,AfterHold=after,Resumed=resumed,Stopped=true};
+     var resumed=w.LatestObservation;w.ConfirmStopForTest=_=>Task.FromResult(true);await w.RequestStopAsync(false);Check(!w.IsOutputActive&&!w.Surface.ProgramMode&&w.Surface.Canvas.SessionId==canvasId&&w.SynchronizationSession==sync,"stop changed shared canvas or LTC source");return new{Before=before,AfterHold=after,Resumed=resumed,Stopped=true};
     }finally{w.ConfirmStopForTest=null;await w.DisarmAsync();}
    });
   }finally{await w.Monitor.DisposeAsync();Stage("complete");File.WriteAllText(Path.Combine(folder,"exit-code.txt"),failed?"1":"0");MainWindow.Shutdown(failed?1:0);}

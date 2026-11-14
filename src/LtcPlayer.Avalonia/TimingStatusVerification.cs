@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using LtcPlayer.App;
 namespace LtcPlayer.Avalonia;
 public static class TimingStatusVerification
@@ -24,15 +26,33 @@ public static class TimingStatusVerification
     }
    }));
    var row=new CueRow{FilePath=Path.Combine(Program.Option("--fixtures")!,"h264-aac.mp4")};await ShowProgramService.RefreshAsync(row,CancellationToken.None);w.Editor.Add(row);await w.Preview.LoadAsync(row.FilePath);
-   await Test("main display shows live manual video and audio status",async()=>{await w.ChangeAudioAsync(true);await w.Preview.PlayAsync();await Until(()=>Text("VideoTimingStatus")=="映像：遅延なし"&&Text("AudioTimingStatus")=="音声：遅延なし");Check(w.FindControl<TextBlock>("VideoTimingStatus")!.IsEffectivelyVisible&&w.FindControl<TextBlock>("AudioTimingStatus")!.IsEffectivelyVisible,"hidden");Capture();});
+   await Test("main display shows live manual video and audio status",async()=>{await w.ChangeAudioAsync(true);await w.Preview.PlayAsync();await Until(()=>Text("VideoTimingStatus")=="映像：再生中"&&Text("AudioTimingStatus")=="音声：再生中");Check(w.FindControl<TextBlock>("VideoTimingStatus")!.IsEffectivelyVisible&&w.FindControl<TextBlock>("AudioTimingStatus")!.IsEffectivelyVisible,"hidden");Capture();});
    await Test("pause and off replace healthy timing labels",async()=>{await w.Preview.PauseAsync();await Until(()=>Text("VideoTimingStatus")=="映像：一時停止"&&Text("AudioTimingStatus")=="音声：一時停止");await w.ChangeAudioAsync(false);await Until(()=>Text("AudioTimingStatus")=="音声：OFF");});
-   await Test("LTC status uses the common clock and rejects faulted input",async()=>{
+   await Test("manual stop aligns video and audio with output off and on while audio OFF stays explicit",async()=>{
+    foreach(bool output in new[]{false,true}){
+     if(output)await w.ArmAsync();
+     await w.ChangeAudioAsync(true);await w.PlayCueForTestAsync(row);
+     await Until(()=>Text("VideoTimingStatus")=="映像：再生中"&&Text("AudioTimingStatus")=="音声：再生中");
+     var stop=w.FindControl<DataGrid>("CueGrid")!.GetVisualDescendants().OfType<Button>().Single(b=>b.DataContext==row&&b.Classes.Contains("cue-stop"));
+     Check(stop.IsEnabled,"stop button disabled");stop.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+     await Until(()=>Text("VideoTimingStatus")=="映像：停止中"&&Text("AudioTimingStatus")=="音声：停止中");
+     Check(w.Preview.Snapshot.Position==0&&!w.Coordinator.ReadAudioPlayhead().Advancing,"stop transport changed");
+     using(var image=new global::Avalonia.Media.Imaging.RenderTargetBitmap(new global::Avalonia.PixelSize((int)w.ClientSize.Width,(int)w.ClientSize.Height),new global::Avalonia.Vector(96,96))){image.Render(w);image.Save(Path.Combine(folder,output?"stopped-output-on.png":"stopped-output-off.png"));}
+     await w.ChangeAudioAsync(false);await Until(()=>Text("AudioTimingStatus")=="音声：OFF");
+     if(output)await w.DisarmAsync();
+    }
+   });
+   await Test("LTC reception interpolation loss and input fault remain distinct",async()=>{
     await w.ApplySettingsAsync(new(new(Rate:"29.97 DF",Offset:3),VideoRenderer.Displays().First(d=>d.Primary!=0)));
-    int receiving=1,frames=15;await w.ChangeAudioAsync(true);await w.Monitor.ConfigureAsync(new(Rate:"29.97 DF"),async(clock,token)=>{while(!token.IsCancellationRequested){if(Volatile.Read(ref receiving)!=0){int f=Interlocked.Increment(ref frames);clock.Accept(new TcFrame{Seconds=f/30,Frame=f%30,Drop=1},MasterClock.Timestamp());}await Task.Delay(33,token);}});
+    int receiving=1,frames=15;await w.ChangeAudioAsync(true);await w.Monitor.ConfigureAsync(new(Rate:"29.97 DF",Freewheel:1),async(clock,token)=>{while(!token.IsCancellationRequested){if(Volatile.Read(ref receiving)!=0){int f=Interlocked.Increment(ref frames);clock.Accept(new TcFrame{Seconds=f/30,Frame=f%30,Drop=1},MasterClock.Timestamp());}await Task.Delay(33,token);}});
     await Until(()=>Text("VideoTimingStatus")=="映像：遅延なし"&&Text("AudioTimingStatus")=="音声：遅延なし");
-    Volatile.Write(ref receiving,0);w.Monitor.Clock.Fault();await Until(()=>Text("VideoTimingStatus")=="映像：入力エラー");Check(Text("AudioTimingStatus")!="音声：遅延なし","fault called healthy");
+    Volatile.Write(ref receiving,0);
+    await Until(()=>Text("VideoTimingStatus")=="映像：補間中"&&Text("AudioTimingStatus")=="音声：補間中");
+    await Until(()=>Text("VideoTimingStatus")=="映像：入力待ち"&&Text("AudioTimingStatus")=="音声：入力待ち");
+    Volatile.Write(ref receiving,1);await Until(()=>Text("VideoTimingStatus")=="映像：遅延なし"&&Text("AudioTimingStatus")=="音声：遅延なし");
+    Volatile.Write(ref receiving,0);w.Monitor.Clock.Fault();await Until(()=>Text("VideoTimingStatus")=="映像：入力エラー"&&Text("AudioTimingStatus")=="音声：入力エラー");
    });
   }catch(Exception e){failed=true;File.WriteAllText(Path.Combine(folder,"fatal.txt"),e.ToString());}
-  finally{await w.DisposeSharedAudioAsync();await w.Preview.DisposeAsync();await w.Monitor.DisposeAsync();MainWindow.Shutdown(failed?1:0);}
+  finally{await w.DisarmAsync();await w.DisposeSharedAudioAsync();await w.Preview.DisposeAsync();await w.Monitor.DisposeAsync();MainWindow.Shutdown(failed?1:0);}
  }
 }

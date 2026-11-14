@@ -5,6 +5,7 @@ namespace LtcPlayer.App;
 public sealed record AudioPlayhead(Guid SessionId,Guid CueId,int Generation,string Path,double Position,double Duration,bool Advancing,double HostSeconds,bool LtcDriven=false,string Notice="",bool SourceOwnsClock=false)
 {
     // Preparation grants decode permission only; it never grants output permission.
+    public int SourceRevision{get;init;}
     public bool PreparationRequested{get;init;}
     [System.Text.Json.Serialization.JsonIgnore]
     public CancellationToken PreparationCancellation{get;init;}

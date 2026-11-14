@@ -1,6 +1,12 @@
 {
   "Version": 1,
   "Suites": [
+    {"Name":"display-columns","Count":8,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"},
+    {"Name":"ui-copy","Count":7,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"},
+    {"Name":"cover-height","Count":8,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"},
+    {"Name":"save-layout","Count":13,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":150,"Mode":"Auto"},
+    {"Name":"multi-selection","Count":22,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":150,"Mode":"Auto"},
+    {"Name":"ltc-settings","Count":22,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":150,"Mode":"Auto"},
     {
       "Name": "preview-clip",
       "Count": 8,
@@ -11,7 +17,7 @@
     },
     {
       "Name": "timing-status",
-      "Count": 8,
+      "Count": 9,
       "Evidence": "results.json",
       "Kind": "Status",
       "TimeoutSeconds": 120,
@@ -298,6 +304,54 @@
       "Name": "redesign-baseline",
       "Mode": "Historical",
       "Reason": "Pre-migration baseline; not a current-product acceptance test."
+    },
+    {
+      "Name": "material-recovery",
+      "Count": 6,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "operation-access",
+      "Count": 14,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "cue-editing",
+      "Count": 12,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "lost-editing",
+      "Count": 6,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "hap-preparation",
+      "Count": 7,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
+    },
+    {
+      "Name": "cover-changes",
+      "Count": 15,
+      "Evidence": "results.json",
+      "Kind": "Status",
+      "TimeoutSeconds": 120,
+      "Mode": "Auto"
     }
   ]
 }
