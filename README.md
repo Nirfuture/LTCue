@@ -28,6 +28,4 @@ Windows 11 x64対応。現在はプレビュー版です。
 
 ## ライセンス
 
-アプリ本体はMITライセンス、libltcを使用する音声DLLはLGPLです。LucideアイコンはISC、一部の元アイコンはMITです。
-
-詳細は[LICENSE](LICENSE)、[NOTICE.md](NOTICE.md)、[LICENSES](LICENSES)を参照してください。
+個人・商用を問わず利用できます。通常の利用にクレジット表示は不要です。改変・再配布の条件は、同梱のライセンス資料を参照してください。
