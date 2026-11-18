@@ -44,15 +44,15 @@ public static class CueFormatVerification
     var header=grid.GetVisualDescendants().OfType<DataGridColumnHeader>().Single(h=>Equals(h.Content,"解像度"));
     var button=header.GetVisualDescendants().OfType<Button>().Single();
     var point=button.TranslatePoint(default,header)!.Value;
-    Check(button.Bounds.Width>=26&&point.X>=0&&point.X+button.Bounds.Width<=header.Bounds.Width+1,"header menu clipped");Capture(w,"empty-presets");
+    Check(button.Bounds.Width>=24&&point.X>=0&&point.X+button.Bounds.Width<=header.Bounds.Width+1,"header menu clipped");Capture(w,"empty-presets");
    });
    await Test("dimensions mode stays fixed and metadata and new rows do not resize",async()=>{
     await Set(new(){Mode=CueResolutionMode.Dimensions});Check(Math.Abs(column.ActualWidth-150)<1,"dimensions width");
-    row.PixelWidth=3840;row.PixelHeight=2160;Check(row.ResolutionDisplay=="3840×2160"&&row.ResolutionTooltip=="3840×2160"&&row.ContainerDisplay=="MOV","metadata stale");
+    row.PixelWidth=3840;row.PixelHeight=2160;Check(row.ResolutionDisplay=="3840×2160"&&row.ResolutionTooltip==null&&row.ContainerDisplay=="MOV","metadata stale");
     await Task.Delay(50);
     var codecCell=grid.GetVisualDescendants().OfType<TextBlock>().Single(t=>t.Text=="HAP");
     var resolutionCell=grid.GetVisualDescendants().OfType<TextBlock>().Single(t=>t.Text=="3840×2160");
-    Check(Equals(ToolTip.GetTip(codecCell),"MOV")&&Equals(ToolTip.GetTip(resolutionCell),"3840×2160"),"column tooltip bindings");
+    Check(Equals(ToolTip.GetTip(codecCell),"MOV")&&ToolTip.GetTip(resolutionCell)==null,"column tooltip bindings");
     w.Editor.Add(new(){FilePath="portrait.mov",Codec="HAP",PixelWidth=1080,PixelHeight=1920});await Task.Delay(100);
     Check(w.Editor.Rows.Last().ResolutionDisplay=="1080×1920"&&Math.Abs(column.ActualWidth-150)<1,"new row settings/width");
    });
@@ -62,6 +62,10 @@ public static class CueFormatVerification
     foreach(var b in dialog.GetVisualDescendants().OfType<Button>().Where(b=>b.Content is string)){
      var p=b.TranslatePoint(default,dialog)!.Value;Check(p.X>=0&&p.Y>=0&&p.X+b.Bounds.Width<=dialog.ClientSize.Width+1&&p.Y+b.Bounds.Height<=dialog.ClientSize.Height+1,"button outside dialog: "+b.Content);
     }
+    combo.SelectedIndex=(int)CueResolutionMode.Dimensions;await Task.Delay(50);
+    Check(!Button(dialog,"プリセットを追加").IsEffectivelyVisible && dialog.GetVisualDescendants().OfType<TextBox>().Where(t=>t.Watermark is "幅" or "高さ" or "表示名").All(t=>!t.IsEffectivelyVisible),"dimensions mode exposes presets");
+    Capture(dialog,"dialog-dimensions");combo.SelectedIndex=(int)CueResolutionMode.Preset;await Task.Delay(50);
+    Check(Button(dialog,"プリセットを追加").IsEffectivelyVisible && dialog.GetVisualDescendants().OfType<TextBox>().Where(t=>t.Watermark is "幅" or "高さ" or "表示名").All(t=>t.IsEffectivelyVisible),"preset mode did not restore inputs");
     Capture(dialog,"dialog-minimum");Click(Button(dialog,"キャンセル"));dialog=null;
    });
    await Test("invalid input and save failures retain draft without applying",async()=>{

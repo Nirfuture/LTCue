@@ -35,7 +35,7 @@ public sealed class CueRow : INotifyPropertyChanged
     public CueFormatPreferences FormatPreferences{get=>formatPreferences;set{formatPreferences=value;FormatChanged();}}
     public string ResolutionDisplay=>formatPreferences.Resolution(PixelWidth,PixelHeight);
     public string ContainerDisplay { get { try{return Path.GetExtension(FilePath).TrimStart('.').ToUpperInvariant();}catch(ArgumentException){return "";} } }
-    public string ResolutionTooltip=>PixelWidth>0&&PixelHeight>0?$"{PixelWidth}×{PixelHeight}":"";
+    public string? ResolutionTooltip=>formatPreferences.Mode==CueResolutionMode.Dimensions?null:PixelWidth>0&&PixelHeight>0?$"{PixelWidth}×{PixelHeight}":"";
     void FormatChanged(){Changed(nameof(ResolutionDisplay));Changed(nameof(ResolutionTooltip));}
     public int PixelWidth{get=>pixelWidth;set{if(pixelWidth==value)return;pixelWidth=value;Changed();FormatChanged();}}
     public int PixelHeight{get=>pixelHeight;set{if(pixelHeight==value)return;pixelHeight=value;Changed();FormatChanged();}}

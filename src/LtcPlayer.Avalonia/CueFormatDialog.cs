@@ -44,7 +44,8 @@ internal sealed class CueFormatDialog : Window
   Heading("幅（px）",0);Heading("高さ（px）",2);Heading("表示名",3);
   var top=new StackPanel{Spacing=12};
   top.Children.Add(TimecodeEditDialog.Field("解像度の表示",mode));
-  top.Children.Add(new TextBlock{Text="解像度プリセット",FontWeight=FontWeight.SemiBold,Margin=new Thickness(0,8,0,0)});
+  var presetHeading=new TextBlock{Text="解像度プリセット",FontWeight=FontWeight.SemiBold,Margin=new Thickness(0,8,0,0)};
+  top.Children.Add(presetHeading);
   top.Children.Add(header);
   // Reserve space for the vertical scrollbar in both the heading and editable rows.
   header.Margin=new Thickness(0,0,20,0);
@@ -58,7 +59,7 @@ internal sealed class CueFormatDialog : Window
   cancel.Click+=(_,_)=>Close();
   apply.Click+=(_,_)=>{
    try{
-    var presets=inputs.Select((v,i)=>{
+    var presets=mode.SelectedIndex==(int)CueResolutionMode.Dimensions?current.Presets:inputs.Select((v,i)=>{
      if(!int.TryParse(v.Width.Text,out int w)||w<=0||!int.TryParse(v.Height.Text,out int h)||h<=0)
       throw new InvalidDataException($"プリセット {i+1}行目：幅・高さは正の整数を入力してください");
      return new ResolutionPreset(w,h,(v.Name.Text??"").Trim());
@@ -74,6 +75,13 @@ internal sealed class CueFormatDialog : Window
   top.Margin=new Thickness(0,0,0,8);layout.Children.Add(top);
   Grid.SetRow(scroll,1);layout.Children.Add(scroll);
   Grid.SetRow(bottom,2);layout.Children.Add(bottom);Content=layout;
+  void UpdateMode()
+  {
+   bool show=mode.SelectedIndex==(int)CueResolutionMode.Preset;
+   presetHeading.IsVisible=header.IsVisible=scroll.IsVisible=add.IsVisible=show;
+   error.Text="";
+  }
+  mode.SelectionChanged+=(_,_)=>UpdateMode();UpdateMode();
   KeyDown+=(_,e)=>{if(e.Key==Key.Escape){e.Handled=true;Close();}};
   WindowPlacement.Track(this);
  }
