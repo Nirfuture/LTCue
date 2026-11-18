@@ -159,8 +159,16 @@ public partial class MainWindow : Window
   Control<TextBlock>("PreviewName").Text=p.Name==""?"未再生":p.Name;
   SetPreviewTimes(p.Position,p.Duration,Preview.FrameRate);
   UpdatePreviewNotice(p.State==PreviewState.Error?p.Notice:"");
-  var slider=Control<Slider>("Seek");slider.Maximum=Math.Max(.001,p.Duration);
-  if(!scrubbing&&!keyboardSeeking){updatingSeek=true;slider.Value=p.Position;updatingSeek=false;}
+  UpdateSeekPosition(p.Position,p.Duration);
+ }
+ void UpdateSeekPosition(double position,double duration)
+ {
+  if(scrubbing||keyboardSeeking)return;
+  updatingSeek=true;
+  try{
+   var slider=Control<Slider>("Seek");slider.Maximum=Math.Max(.001,duration);
+   slider.Value=Math.Clamp(position,0,slider.Maximum);
+  }finally{updatingSeek=false;}
  }
  readonly DispatcherTimer activityDelay=new(){Interval=TimeSpan.FromMilliseconds(50)};
  double activitySince;

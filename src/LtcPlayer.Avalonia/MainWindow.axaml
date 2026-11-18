@@ -131,7 +131,14 @@
       <Border Height="1" Background="{DynamicResource Palette.Border}" Margin="0,3"/>
       <TextBlock x:Name="PreviewName" Text="未再生" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
       <WrapPanel Orientation="Horizontal">
-       <TextBlock x:Name="VideoTimingStatus" Text="映像：停止中" Margin="0,0,16,0" FontSize="13"/>
+       <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+        <TextBlock x:Name="VideoTimingStatus" Text="映像：停止中" FontSize="13"/>
+        <StackPanel x:Name="VideoFrameRateGroup" Orientation="Horizontal" IsVisible="False">
+         <TextBlock Text=" (" FontSize="13" Foreground="{DynamicResource Palette.SecondaryText}"/>
+         <TextBlock x:Name="VideoFrameRateNumber" Text="--.-" FontSize="13" Foreground="{DynamicResource Palette.SecondaryText}"/>
+         <TextBlock Text=" fps)" FontSize="13" Foreground="{DynamicResource Palette.SecondaryText}"/>
+        </StackPanel>
+       </StackPanel>
        <TextBlock x:Name="AudioTimingStatus" Text="音声：OFF" FontSize="13"/>
       </WrapPanel>
       <TextBlock x:Name="RunInfo" MinHeight="18" MaxLines="1" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Palette.SecondaryText}" FontSize="12" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}"/>

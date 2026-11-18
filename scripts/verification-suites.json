@@ -17,7 +17,7 @@
     },
     {
       "Name": "timing-status",
-      "Count": 9,
+      "Count": 11,
       "Evidence": "results.json",
       "Kind": "Status",
       "TimeoutSeconds": 120,

@@ -80,8 +80,9 @@ public partial class MainWindow
    var cue=Editor.Rows.FirstOrDefault(c=>c.CueId==t.CueId);
    Control<TextBlock>("PreviewName").Text=t.CueId.HasValue?CueName(t.CueId):"再生待機";
    SetPreviewTimes(t.FramePts,cue?.Duration,cue?.FrameRate??0);
+   UpdateSeekPosition(t.FramePts??0,cue?.Duration??0);
    Control<TextBlock>("RunInfo").Text="LTC同期";
-   ToolTip.SetTip(Control<TextBlock>("RunInfo"),$"スキップフレーム数：{t.Skipped}");
+   ToolTip.SetTip(Control<TextBlock>("RunInfo"),null);
    UpdatePreviewNotice(t.Notice);
   }else{
    ToolTip.SetTip(Control<TextBlock>("RunInfo"),null);

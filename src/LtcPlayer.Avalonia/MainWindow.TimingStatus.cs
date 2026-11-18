@@ -5,6 +5,7 @@ namespace LtcPlayer.Avalonia;
 public partial class MainWindow
 {
  readonly PlaybackTimingStatus videoTiming=new(),audioTiming=new();
+ readonly FrameRateMeter frameRateMeter=new();
  static string? LtcTimingPhase(SyncState state)=>state switch{
   SyncState.LOCKED=>null,SyncState.RESYNC=>"再同期中",SyncState.FREEWHEEL=>"補間中",
   SyncState.LOST or SyncState.WAITING=>"入力待ち",SyncState.ERROR=>"入力エラー",_=>"確認中"};
@@ -30,6 +31,17 @@ public partial class MainWindow
   }
   if(Surface.Ready&&Surface.Canvas.SharedDeviceError<0)inactive="描画エラー";
   SetTimingText("VideoTimingStatus","映像",videoTiming.Read(identity,error,Math.Max(.05,fps>0?1.5/fps:.05),now,inactive),SyncOwnsSurface);
+  var rateObservation=playback.Observation;
+  bool rateActive=SyncOwnsSurface&&input.State is (SyncState.LOCKED or SyncState.FREEWHEEL or SyncState.RESYNC)&&
+   rateObservation is {FramePts:not null,ScheduledCue:not null}&&rateObservation.CueId==rateObservation.ScheduledCue.CueId&&
+   rateObservation.InputGeneration==input.Generation&&now-rateObservation.HostSeconds<=.5&&
+   !(Surface.Ready&&Surface.Canvas.SharedDeviceError<0);
+  if(rateActive){
+   var rate=frameRateMeter.Read(identity,rateObservation!.HostSeconds,(long)rateObservation.Presented-rateObservation.Repeated,fps);
+   SetFrameRateDisplay(rate,frameRateMeter.IsLow);
+  }else{
+   frameRateMeter.Reset();Control<StackPanel>("VideoFrameRateGroup").IsVisible=false;
+  }
   var head=playback.ReadAudioPlayhead();bool syncAudio=SyncOwnsSurface||head.LtcDriven;
   string? audioState=!audioRequested?"OFF":a.State switch{
    SharedAudioState.Off=>"OFF",SharedAudioState.Preparing=>"準備中",SharedAudioState.Resyncing=>"再同期中",SharedAudioState.NoAudio=>"音声なし／非対応",SharedAudioState.Error=>"エラー",
@@ -42,6 +54,13 @@ public partial class MainWindow
    else if(!syncAudio)audioState="再生中";
   }
   SetTimingText("AudioTimingStatus","音声",audioTiming.Read($"{head.SessionId}/{a.CueId}/{a.Generation}",a.ErrorSeconds,.05,now,audioState),syncAudio);
+ }
+ internal void SetFrameRateDisplay(double? rate,bool low){
+  var group=Control<StackPanel>("VideoFrameRateGroup");group.IsVisible=true;
+  var number=Control<TextBlock>("VideoFrameRateNumber");
+  string value=rate.HasValue?rate.Value.ToString("F1",System.Globalization.CultureInfo.InvariantCulture):"--.-";
+  if(number.Text!=value)number.Text=value;
+  number.Foreground=low?ThemePalette.ErrorText:ThemePalette.SecondaryText;
  }
  void SetTimingText(string name,string label,TimingStatus status,bool synchronized){
   var text=Control<TextBlock>(name);text.Text=$"{label}：{status.Text}";
