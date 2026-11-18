@@ -156,5 +156,43 @@ await Test("failed preference save preserves existing file and cleans temporary 
 }));
 } finally { Directory.Delete(folder,true); }
 
+await Test("cue format matches both dimensions and handles missing values in every mode", () => Run(() => {
+    var p=new CueFormatPreferences();
+    Check(p.Format("HAP",1920,1080)=="HAP · FHD","default FHD");
+    Check(p.Format("HAP",1980,1080)=="HAP · 未登録","unknown");
+    Check(p.Format("HAP",1080,1920)=="HAP · 未登録","portrait");
+    foreach(var mode in Enum.GetValues<CueResolutionMode>()){
+        var m=p with{Mode=mode};Check(m.Format("HAP",0,1080)=="HAP","unknown size");
+        Check(m.Format("HAP",1920,1080,true)=="HAP · 1920×1080","tooltip");
+        Check(m.Format("",0,0)=="","empty separator");
+    }
+    Check((p with{Mode=CueResolutionMode.Dimensions}).Format("",1920,1080)=="1920×1080","dimensions without codec");
+    var custom=p with{Presets=[new(1980,1080,"LED")]};Check(custom.Format("HAP",1980,1080)=="HAP · LED","custom");
+    Check((custom with{Presets=[]}).Format("HAP",1980,1080)=="HAP · 未登録","delete");
+}));
+await Test("cue format validates dimensions duplicate rows and labels", () => Run(() => {
+    foreach(var presets in new ResolutionPreset[][] { [new(0,720,"HD")], [new(1,-1,"X")], [new(1,1,"")], [new(1,1,"123456789")], [new(1,1,"A"),new(1,1,"B")] })
+        Reject(()=>new CueFormatPreferences{Presets=presets}.Validate());
+    new CueFormatPreferences{Presets=[]}.Validate();
+}));
+await Test("cue format updates notify bindings and replacement clears stale dimensions", () => Run(() => {
+    var row=new CueRow{FilePath="old",Codec="HAP",PixelWidth=1920,PixelHeight=1080};var names=new List<string?>();row.PropertyChanged+=(_,e)=>names.Add(e.PropertyName);
+    row.PixelWidth=1980;Check(row.ResolutionDisplay=="未登録"&&names.Contains("ResolutionDisplay")&&names.Contains("FormatTooltip"),"metadata notifications");
+    row.FormatPreferences=new(){Presets=[new(1980,1080,"LED")]};Check(row.ResolutionDisplay=="LED","settings notification");
+    row.FilePath="replacement";Check(row.PixelWidth==0&&row.PixelHeight==0&&row.ResolutionDisplay=="","stale dimensions");
+}));
+await Test("cue format legacy defaults and explicit empty presets survive persistence", () => Run(() => {
+    string file=Path.Combine(Path.GetTempPath(),"ltcue-format-"+Guid.NewGuid().ToString("N")+".json");
+    try{
+        File.WriteAllText(file,"{}");Check(InputSettings.Load(file).CueFormat.Presets.Length==3,"legacy defaults");
+        File.WriteAllText(file,"{\"CueFormat\":{\"Mode\":\"Hidden\",\"Presets\":[]}}");Check(InputSettings.Load(file).CueFormat.Mode==CueResolutionMode.Preset,"legacy hidden migration");
+        Check(new CueFormatPreferences().Resolution(1920,1080)=="FHD","resolution column excludes codec");
+        Check(new CueFormatPreferences().Resolution(0,1080)=="","missing resolution stays blank");
+        var settings=new InputSettings{AudioVolume=.25,CuePlacement=new(true,2),CueFormat=new(){Mode=CueResolutionMode.Dimensions,Presets=[]}};
+        using(var pending=new PendingSettings(file,settings,"DISPLAY"))pending.Commit();
+        var loaded=InputSettings.Load(file);Check(loaded.CueFormat.Mode==CueResolutionMode.Dimensions&&loaded.CueFormat.Presets.Length==0&&loaded.AudioVolume==.25&&loaded.CuePlacement.AfterExisting,"settings roundtrip");
+    }finally{File.Delete(file);}
+}));
+
 string output=args.FirstOrDefault()??"results.json";Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
 File.WriteAllText(output,JsonSerializer.Serialize(results,new JsonSerializerOptions{WriteIndented=true}));Console.WriteLine($"{results.Count} checks passed");

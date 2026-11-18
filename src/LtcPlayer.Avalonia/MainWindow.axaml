@@ -13,12 +13,41 @@
    </ControlTemplate></Setter>
   </ControlTheme>
   <local:CueDurationConverter x:Key="CueDuration"/>
-  <DataTemplate x:Key="VideoColumnHeader"><Grid ColumnDefinitions="*,6"><TextBlock Text="動画" VerticalAlignment="Center"/><Border Grid.Column="1" Classes="cue-column-resizer" Background="Transparent" Cursor="SizeWestEast" Margin="0,-8,-6,-8" PointerPressed="ColumnResizePressed" PointerMoved="ColumnResizeMoved" PointerReleased="ColumnResizeReleased" PointerCaptureLost="ColumnResizeCaptureLost" ToolTip.Tip="動画とステータスの幅を調整"/></Grid></DataTemplate>
+  <DataTemplate x:Key="VideoColumnHeader">
+   <Grid ColumnDefinitions="*,6">
+    <TextBlock Text="動画" VerticalAlignment="Center"/>
+    <Border Grid.Column="1" Classes="cue-column-resizer" Background="Transparent" Cursor="SizeWestEast" Margin="0,-8,-6,-8" AttachedToVisualTree="ColumnResizeHandleAttached"
+            PointerPressed="ColumnResizePressed" PointerMoved="ColumnResizeMoved" PointerReleased="ColumnResizeReleased" PointerCaptureLost="ColumnResizeCaptureLost"
+            ToolTip.Tip="左右にドラッグして列幅を調整" AutomationProperties.Name="列幅を調整">
+     <Grid IsHitTestVisible="False">
+      <Border Classes="cue-resize-grip" Padding="3,4" CornerRadius="3" HorizontalAlignment="Center" VerticalAlignment="Center">
+       <StackPanel Orientation="Horizontal" Spacing="2">
+        <Border Classes="cue-resize-mark" Width="1" Height="12" CornerRadius="0.5"/>
+        <Border Classes="cue-resize-mark" Width="1" Height="12" CornerRadius="0.5"/>
+       </StackPanel>
+      </Border>
+     </Grid>
+    </Border>
+   </Grid>
+  </DataTemplate>
   <DataTemplate x:Key="TimecodeColumnHeader">
    <Grid ColumnDefinitions="*,Auto">
     <TextBlock Text="開始TC" HorizontalAlignment="Center" VerticalAlignment="Center"/>
     <Button Grid.Column="1" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="6,0" MinWidth="26" MinHeight="26"
             AttachedToVisualTree="TimecodeMenuAttached" Click="TimecodeMenuClick" AutomationProperties.Name="開始TCメニュー">
+     <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <Ellipse Width="2" Height="2" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+      <Ellipse Width="2" Height="2" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+      <Ellipse Width="2" Height="2" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+     </StackPanel>
+    </Button>
+   </Grid>
+  </DataTemplate>
+  <DataTemplate x:Key="ResolutionColumnHeader">
+   <Grid ColumnDefinitions="*,Auto">
+    <TextBlock Text="解像度" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <Button Grid.Column="1" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="6,0" MinWidth="26" MinHeight="26"
+            Click="FormatMenuClick" AutomationProperties.Name="解像度の表示設定">
      <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center" VerticalAlignment="Center">
       <Ellipse Width="2" Height="2" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
       <Ellipse Width="2" Height="2" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
@@ -45,6 +74,9 @@
   <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="{DynamicResource Palette.AccentColor}"/>
  </Window.Resources>
  <Window.Styles>
+  <Style Selector="Border.cue-resize-grip"><Setter Property="Background" Value="{DynamicResource Palette.PanelBackground}"/></Style>
+  <Style Selector="Border.cue-resize-mark"><Setter Property="Background" Value="{DynamicResource Palette.SecondaryText}"/></Style>
+  <Style Selector="Border.cue-column-resizer:pointerover Border.cue-resize-mark, Border.cue-column-resizer.resizing Border.cue-resize-mark"><Setter Property="Background" Value="{DynamicResource Palette.Accent}"/></Style>
   <Style Selector="Border.cover-fade:focus-within"><Setter Property="BorderBrush" Value="{DynamicResource Palette.Accent}"/></Style>
   <Style Selector="TextBlock.error"><Setter Property="Foreground" Value="{DynamicResource Palette.ErrorText}"/></Style>
   <Style Selector="Button"><Setter Property="Padding" Value="12,8"/></Style>
@@ -101,6 +133,7 @@
        <DataGridTemplateColumn Header="長さ" HeaderTemplate="{StaticResource CenteredHeader}" Width="112"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Converter={StaticResource CueDuration}}" VerticalAlignment="Center" HorizontalAlignment="Center" FontFamily="Consolas" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Converter={StaticResource CueDuration}}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
        <DataGridTemplateColumn Header="fps" HeaderTemplate="{StaticResource CenteredHeader}" Width="64"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding FrameRate,StringFormat=F2}" VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding FrameRate,StringFormat=F2}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
        <DataGridTemplateColumn Header="形式" HeaderTemplate="{StaticResource CenteredHeader}" Width="70"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Codec}" VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Codec}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTemplateColumn Header="解像度" Tag="resolution" HeaderTemplate="{StaticResource ResolutionColumnHeader}" Width="130" CanUserResize="False"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding ResolutionDisplay}" VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding FormatTooltip}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
        <DataGridTemplateColumn Header="ステータス" Tag="status" Width="*" MinWidth="120"><DataGridTemplateColumn.CellTemplate><DataTemplate x:DataType="core:CueRow"><TextBlock Classes.error="{Binding HasError}" Text="{Binding IssueText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding IssueText}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
       </DataGrid.Columns>
      </DataGrid>

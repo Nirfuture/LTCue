@@ -28,7 +28,7 @@ public partial class MainWindow : Window
  void StatusMessage(string s)=>Control<TextBlock>("Status").Text=s;
  public MainWindow()
  {
-  AvaloniaXamlLoader.Load(this);Grid.ItemsSource=Editor.Rows;Grid.SelectionChanged+=(_,_)=>UpdateCueSelectionControls();
+  AvaloniaXamlLoader.Load(this);Grid.ItemsSource=Editor.Rows;Editor.Rows.CollectionChanged+=(_,_)=>ApplyCueFormat();Grid.SelectionChanged+=(_,_)=>UpdateCueSelectionControls();
 #if VERIFICATION
   // Presentation assertions require an unoccluded test surface. Do not change
   // the product's window policy or treat an occluded presentation as displayed.
@@ -70,7 +70,7 @@ public partial class MainWindow : Window
  async Task InitializeAsync()
  {
   try {
-   settings=InputSettings.Load(Program.Option("--settings"));
+   settings=InputSettings.Load(Program.Option("--settings"));ApplyCueFormat();
    bool loadDefault=Program.Option("--program")==null&&(!Program.Arguments.Any(a=>a.StartsWith("--verify-",StringComparison.Ordinal))||Program.Option("--verify-default-show")!=null);
    if(loadDefault&&!File.Exists(Program.Option("--settings")??InputSettings.PathName))settings=settings with{Rate="29.97 DF"};
    Editor.Rate=TimecodeRate.Modes.FirstOrDefault(r=>r.Name==settings.Rate)??TimecodeRate.Modes[1];
@@ -83,6 +83,7 @@ public partial class MainWindow : Window
    await Dispatcher.UIThread.InvokeAsync(FitInitialContentHeight,DispatcherPriority.Loaded);
    presentationReady=true;StartMaterialMonitor();
 #if VERIFICATION
+   if(Program.Option("--verify-cue-format") is {} formatFolder){await CueFormatVerification.RunAsync(this,formatFolder);return;}
    if(Program.Option("--verify-timecode-editing") is {} timecodesFolder)await TimecodeEditingVerification.RunAsync(this,timecodesFolder);
    if(Program.Option("--verify-display-columns") is {} columnsFolder)await DisplayColumnsVerification.RunAsync(this,columnsFolder);
    if(Program.Option("--verify-ui-copy") is {} copyFolder)await UiCopyVerification.RunAsync(this,copyFolder);

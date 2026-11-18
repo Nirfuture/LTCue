@@ -6,7 +6,7 @@ public sealed class CueRow : INotifyPropertyChanged
 {
     public Guid CueId{get;set;}=Guid.NewGuid();
     private string path="",hours="00",minutes="00",seconds="00",frames="00",warning="",error="";private bool enabled=true;
-    public string FilePath{get=>path;set{if(path==value)return;path=value;SourceRevision=Interlocked.Increment(ref nextSourceRevision);Duration=FrameRate=0;Codec="";SourceError="";AudioIssue="";Changed();Changed(nameof(Name));}}
+    public string FilePath{get=>path;set{if(path==value)return;path=value;SourceRevision=Interlocked.Increment(ref nextSourceRevision);Duration=FrameRate=0;PixelWidth=PixelHeight=0;Codec="";SourceError="";AudioIssue="";Changed();Changed(nameof(Name));}}
     public string Name { get { try{return Path.GetFileName(FilePath);}catch(ArgumentException){return FilePath;} } }
     public string Hours{get=>hours;set{hours=value;Changed();}}
     public string Minutes{get=>minutes;set{minutes=value;Changed();}}
@@ -27,11 +27,17 @@ public sealed class CueRow : INotifyPropertyChanged
     public string IssueText=>string.Join(" / ",new[]{(Error!=""||SourceError!="")?(Enabled?"同期対象外：":"無効／")+string.Join(" / ",new[]{Error,SourceError}.Where(x=>x!="")):"",AudioIssue!=""?"音声エラー："+AudioIssue:"",Warning}.Where(x=>!string.IsNullOrWhiteSpace(x)));
     public void ClearSourceError(){if(SourceError!=""){SourceRevision=Interlocked.Increment(ref nextSourceRevision);SourceError="";}}
     public void AcceptMedia(MediaInfo info){PixelWidth=info.Width;PixelHeight=info.Height;Duration=info.Duration;FrameRate=info.FrameRate;Codec=info.Codec;AudioIssue="";SourceRevision=Interlocked.Increment(ref nextSourceRevision);SourceError="";Changed(nameof(Duration));Changed(nameof(FrameRate));Changed(nameof(Codec));}
-    public int PixelWidth{get;set;}
-    public int PixelHeight{get;set;}
+    int pixelWidth,pixelHeight;string codec="";
+    CueFormatPreferences formatPreferences=new();
+    public CueFormatPreferences FormatPreferences{get=>formatPreferences;set{formatPreferences=value;FormatChanged();}}
+    public string ResolutionDisplay=>formatPreferences.Resolution(PixelWidth,PixelHeight);
+    public string FormatTooltip=>formatPreferences.Format(Codec,PixelWidth,PixelHeight,true);
+    void FormatChanged(){Changed(nameof(ResolutionDisplay));Changed(nameof(FormatTooltip));}
+    public int PixelWidth{get=>pixelWidth;set{if(pixelWidth==value)return;pixelWidth=value;Changed();FormatChanged();}}
+    public int PixelHeight{get=>pixelHeight;set{if(pixelHeight==value)return;pixelHeight=value;Changed();FormatChanged();}}
     public double Duration{get;set;}
     public double FrameRate{get;set;}
-    public string Codec{get;set;}="";
+    public string Codec{get=>codec;set{if(codec==value)return;codec=value;Changed();FormatChanged();}}
     public int DisplayOrder{get;set;}
     public string StartTimecode=>$"{Hours.PadLeft(2,'0')}:{Minutes.PadLeft(2,'0')}:{Seconds.PadLeft(2,'0')}:{Frames.PadLeft(2,'0')}";
     public void SetStart(string value){var p=value.Split(':',';');if(p.Length!=4)throw new InvalidDataException("開始TCの形式不正");Hours=p[0];Minutes=p[1];Seconds=p[2];Frames=p[3];}

@@ -68,7 +68,7 @@ try{
  $watch=[Diagnostics.Stopwatch]::StartNew()
  $exit=Invoke-VerificationProcess $dotnet @($TimecodeEditingAssemblyPath,(Join-Path $folder 'results.json')) $folder 90
  $items=@(Get-Content -LiteralPath (Join-Path $folder 'results.json') -Raw | ConvertFrom-Json)
- $ok=$exit -eq 0 -and $items.Count -eq 27 -and @($items | Where-Object status -ne 'PASS').Count -eq 0
+ $ok=$exit -eq 0 -and $items.Count -eq 31 -and @($items | Where-Object status -ne 'PASS').Count -eq 0
  $summary.Add([ordered]@{Suite='timecode-editing-calculation';Status=$(if($ok){'PASS'}else{'FAIL'});Count=$items.Count;ExitCode=$exit;Seconds=$watch.Elapsed.TotalSeconds})
  foreach($suite in $catalog.Suites | Where-Object Mode -eq Auto){
   if($suite.Name -notmatch '^[a-z0-9-]+$'){throw 'Invalid suite name.'}
