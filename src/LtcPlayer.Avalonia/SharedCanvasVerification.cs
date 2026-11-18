@@ -26,6 +26,20 @@ public static class SharedCanvasVerification
                 for(int i=0;i<50;i++){
                     canvas.AttachOutput(display,mode,true);Check(canvas.SessionId==id&&canvas.FrameId==frame&&canvas.FramePts==2.5,"playback changed");
                     Check(canvas.Readback().AsSpan().SequenceEqual(pixels),"attach changed composition");
+                    if(i==0){
+                        await Task.Delay(80);canvas.RefreshOutput();await Task.Delay(40);canvas.RefreshOutput();
+                        var stable=canvas.ExternalPresentCountsForTest();
+                        for(int tick=0;tick<8;tick++){canvas.RefreshOutput();await Task.Delay(10);}
+                        Check(canvas.ExternalPresentCountsForTest()==stable,"held image is re-presented on every poll");
+                        canvas.InvalidateOutputForTest();canvas.RefreshOutput();await Task.Delay(40);canvas.RefreshOutput();
+                        var invalidated=canvas.ExternalPresentCountsForTest();Check(invalidated.Presents>stable.Presents,"WM_PAINT did not re-present held image");
+                        canvas.RefreshOutput();Check(canvas.ExternalPresentCountsForTest()==invalidated,"completed redraw remained pending");
+                        canvas.SetOutputVisibilityForTest(false);await Task.Delay(40);canvas.Redraw();canvas.RefreshOutput();
+                        canvas.SetOutputVisibilityForTest(true);await Task.Delay(80);canvas.RefreshOutput();await Task.Delay(40);canvas.RefreshOutput();
+                        var restored=canvas.ExternalPresentCountsForTest();Check(restored.Presents>invalidated.Presents,"hidden held output did not recover");
+                        Check(canvas.Readback().AsSpan().SequenceEqual(pixels),"restore changed held composition");
+                        canvas.RefreshOutput();Check(canvas.ExternalPresentCountsForTest()==restored,"restored output keeps re-presenting");
+                    }
                     canvas.DetachOutput();Check(!canvas.OutputAttached&&canvas.SessionId==id,"detach changed session");
                     Check(canvas.Readback().AsSpan().SequenceEqual(pixels),"detach changed image");await Task.Delay(10);
                 }

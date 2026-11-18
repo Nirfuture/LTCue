@@ -35,6 +35,8 @@ struct Output {
     bool monitorPresentPending=false;HRESULT monitorPresentResult=S_FALSE;
     unsigned long long monitorRendered=0,monitorRetries=0,monitorOccluded=0,monitorGpuBusy=0;
     ComPtr<ID3D11Device> device; ComPtr<ID3D11DeviceContext> context;
+    bool externalPresentPending=false,externalBackBufferReady=false,externalOccluded=false;
+    unsigned long long externalPresentCalls=0,externalRetryCalls=0;
     ComPtr<IDXGISwapChain> swap; ComPtr<ID3D11Texture2D> upload;
     ComPtr<ID3D11Texture2D> compressed,rendered,last;
     ComPtr<ID3D11ShaderResourceView> compressedView;
@@ -53,6 +55,10 @@ struct Output {
     ~Output(){if(context){context->ClearState();context->Flush();}monitor.Reset();swap.Reset();if(context)context->Flush();context.Reset();upload.Reset();device.Reset();if(ownsWindow && window && IsWindow(window))DestroyWindow(window);}
 };
 static void Check(HRESULT hr){if(FAILED(hr)) throw hr;}
+static void RecordExternalPresent(Output* o,HRESULT hr){
+    o->externalOccluded=hr==DXGI_STATUS_OCCLUDED;
+    if(hr==S_OK){o->externalPresentPending=false;o->externalBackBufferReady=false;}
+}
 // Never let Windows relocate a live topmost output onto another monitor.
 static bool OutputDisplayConnected(Output* o) {
     if(!o->displayTracked)return true;
@@ -73,6 +79,10 @@ static void HideDisconnectedOutput(Output* o) {
 }
 static LRESULT CALLBACK OutputProc(HWND window,UINT message,WPARAM w,LPARAM l) {
     auto output=(Output*)GetWindowLongPtrW(window,GWLP_USERDATA);
+    if(output&&output->offscreen&&(message==WM_PAINT||message==WM_SHOWWINDOW&&w)){
+        output->externalPresentPending=true;output->externalBackBufferReady=false;
+        if(message==WM_PAINT){PAINTSTRUCT paint;BeginPaint(window,&paint);EndPaint(window,&paint);return 0;}
+    }
     // Ignore notifications that leave the selected endpoint and geometry unchanged.
     if(message==WM_DISPLAYCHANGE&&output&&output->displayTracked){if(!OutputDisplayConnected(output))HideDisconnectedOutput(output);return 0;}
     if(message==WM_WINDOWPOSCHANGING&&output&&output->displayTracked){

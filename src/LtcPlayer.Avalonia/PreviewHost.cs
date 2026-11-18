@@ -109,7 +109,7 @@ public sealed class PreviewHost : NativeControlHost, ICoverRenderer
         if(!Ready||Canvas.SharedDeviceError<0)return;
         if(Cover!=null&&coverBinding.Apply(Cover,Canvas))Canvas.Redraw();
         Canvas.UpdatePreview();
-        Canvas.RefreshOutput();
+        if(Canvas.CheckOutputHealth())Canvas.RetryPendingPresentation();
     }
     public (int Width,int Height) PixelSize
     {

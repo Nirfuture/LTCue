@@ -53,7 +53,7 @@ public sealed class ProgramPlayback
         OutputPresentation.Validate(outputMode);
         var source=sourceTimeline??new PlaybackTimeline();if(sourceTimeline==null)source.Update(cues);VideoRenderer? renderer=null;CueFrames? active=null,preload=null,recovery=null;bool monitorFaultNotified=false;
         var black=new byte[checked(display.Width*display.Height*4)];int epoch=-1,presented=0,skipped=0,repeated=0,seeks=0;
-        double? lastPts=null;Guid? lastId=null,displayedId=null;double? displayedPts=null;uint verificationPixel=0;
+        VideoFrame? lastFrame=null;double? lastPts=null;Guid? lastId=null,displayedId=null;double? displayedPts=null;uint verificationPixel=0;
         ProgramMonitorStatus? monitorStatus=null;double nextMonitorSample=0;
         long commandVersion=0;ScheduledCue? manualCue=null;double manualStarted=0,manualPosition=0;bool manualReady=false,manualHolding=false,wasManual=false;
         double nextRecovery=0;int recoveryAttempts=0;double? lag=null;
@@ -203,6 +203,9 @@ public sealed class ProgramPlayback
                     }
                     if(pixels==black){candidateId=null;candidatePts=null;}
                 }
+                // Keep the retained image; refresh still polls health, preview and cover updates.
+                // Compare identity so another decoded image with the same PTS is not suppressed.
+                if(texture!=null&&lastId==candidateId&&ReferenceEquals(lastFrame,texture)){pixels=null;texture=null;}
                 if(pixels!=null)
                 {
                     byte[]? verifiedPixels=null;bool adopted=false;
@@ -223,7 +226,7 @@ public sealed class ProgramPlayback
                     if(!adopted)continue;
                     displayedId=candidateId;displayedPts=candidatePts;
                     if(texture!=null&&lastId==displayedId&&lastPts==displayedPts)++repeated;
-                    lastId=displayedId;lastPts=displayedPts;++presented;
+                    lastFrame=texture;lastId=displayedId;lastPts=displayedPts;++presented;
                     if(verify)verificationPixel=BitConverter.ToUInt32(verifiedPixels!,(verifiedPixels!.Length/8)*4);
                 }
                 else await dispatcher.InvokeAsync(()=>{if(presentation!=null)presentation.Refresh();else if(cover!=null&&coverBinding.Apply(cover,renderer!))renderer!.Redraw();});

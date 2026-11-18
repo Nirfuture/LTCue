@@ -12,7 +12,8 @@ extern "C" __declspec(dllexport) int __cdecl canvas_create(int width,int height,
 extern "C" __declspec(dllexport) int __cdecl canvas_detach(void* handle){
  auto o=(Output*)handle;if(!o||!o->offscreen)return E_INVALIDARG;
  o->swap.Reset();if(o->window&&IsWindow(o->window)){SetWindowLongPtrW(o->window,GWLP_USERDATA,0);DestroyWindow(o->window);}
- o->window=nullptr;o->displayTracked=false;o->stopRequested=false;o->externalError=0;return S_OK;
+ o->window=nullptr;o->displayTracked=false;o->stopRequested=false;o->externalError=0;
+ o->externalPresentPending=false;o->externalBackBufferReady=false;o->externalOccluded=false;return S_OK;
 }
 extern "C" __declspec(dllexport) int __cdecl canvas_attach(void* handle,const Display* selected,int compatibility,int probe){
  auto o=(Output*)handle;if(!o||!o->offscreen||!selected||o->swap)return E_INVALIDARG;
@@ -28,17 +29,38 @@ extern "C" __declspec(dllexport) int __cdecl canvas_attach(void* handle,const Di
   ComPtr<IDXGIDevice> dxgi;Check(o->device.As(&dxgi));ComPtr<IDXGIAdapter> adapter;Check(dxgi->GetAdapter(&adapter));ComPtr<IDXGIFactory> factory;Check(adapter->GetParent(IID_PPV_ARGS(&factory)));
   DXGI_SWAP_CHAIN_DESC sd={};sd.BufferDesc.Width=o->width;sd.BufferDesc.Height=o->height;sd.BufferDesc.Format=DXGI_FORMAT_B8G8R8A8_UNORM;sd.SampleDesc.Count=1;sd.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;sd.BufferCount=2;sd.OutputWindow=window;sd.Windowed=TRUE;sd.SwapEffect=compatibility?DXGI_SWAP_EFFECT_DISCARD:DXGI_SWAP_EFFECT_FLIP_DISCARD;
   ComPtr<IDXGISwapChain> swap;Check(factory->CreateSwapChain(o->device.Get(),&sd,&swap));Check(factory->MakeWindowAssociation(window,DXGI_MWA_NO_ALT_ENTER));
-  if(o->last){ComPtr<ID3D11Texture2D> back;Check(swap->GetBuffer(0,IID_PPV_ARGS(&back)));o->context->CopyResource(back.Get(),o->last.Get());Check(swap->Present(0,0));}
+  o->externalPresentPending=o->last!=nullptr;o->externalBackBufferReady=false;o->externalOccluded=false;
+  if(o->last){ComPtr<ID3D11Texture2D> back;Check(swap->GetBuffer(0,IID_PPV_ARGS(&back)));o->context->CopyResource(back.Get(),o->last.Get());o->externalBackBufferReady=true;++o->externalPresentCalls;HRESULT hr=swap->Present(0,0);RecordExternalPresent(o,hr);Check(hr);}
   o->selectedDisplay=*selected;DISPLAY_DEVICEW monitorDevice={};monitorDevice.cb=sizeof(monitorDevice);
   o->monitorDeviceId[0]=0;if(EnumDisplayDevicesW(selected->name,0,&monitorDevice,EDD_GET_DEVICE_INTERFACE_NAME))wcscpy_s(o->monitorDeviceId,monitorDevice.DeviceID);
   o->displayTracked=true;o->displayInvalidated=false;o->externalError=0;o->window=window;o->swap=swap;o->confirmClose=true;o->stopRequested=false;SetWindowLongPtrW(window,GWLP_USERDATA,(LONG_PTR)o);
   ShowWindow(window,SW_SHOWNOACTIVATE);SetWindowPos(window,probe?HWND_NOTOPMOST:HWND_TOPMOST,selected->x,selected->y,probe?640:o->width,probe?360:o->height,SWP_NOACTIVATE|SWP_SHOWWINDOW);return S_OK;
  }catch(HRESULT hr){if(window)DestroyWindow(window);return hr;}catch(...){if(window)DestroyWindow(window);return E_OUTOFMEMORY;}
 }
-// Re-present the existing composition; attaching/detaching never re-composes or changes it.
+// Poll health on every tick, but retry only an unfinished or invalidated image.
 extern "C" __declspec(dllexport) int __cdecl canvas_output_refresh(void* handle){
- auto o=(Output*)handle;if(!o||!o->offscreen)return E_INVALIDARG;if(o->displayTracked&&!OutputDisplayConnected(o))HideDisconnectedOutput(o);if(o->externalError<0)return o->externalError;if(!o->swap||!o->last)return S_FALSE;
- try{if(!IsWindow(o->window))return HRESULT_FROM_WIN32(ERROR_INVALID_WINDOW_HANDLE);ComPtr<ID3D11Texture2D> back;Check(o->swap->GetBuffer(0,IID_PPV_ARGS(&back)));o->context->CopyResource(back.Get(),o->last.Get());return o->swap->Present(0,DXGI_PRESENT_DO_NOT_WAIT);}catch(HRESULT hr){return hr;}
+ auto o=(Output*)handle;if(!o||!o->offscreen)return E_INVALIDARG;
+ if(o->displayTracked&&!OutputDisplayConnected(o))HideDisconnectedOutput(o);
+ if(o->externalError<0)return o->externalError;
+ if(!o->swap||!o->last||!o->externalPresentPending)return S_FALSE;
+ try{
+  if(!IsWindow(o->window))return HRESULT_FROM_WIN32(ERROR_INVALID_WINDOW_HANDLE);
+  if(o->externalOccluded){HRESULT test=o->swap->Present(0,DXGI_PRESENT_TEST);if(test!=S_OK)return test;o->externalOccluded=false;}
+  if(!o->externalBackBufferReady){ComPtr<ID3D11Texture2D> back;Check(o->swap->GetBuffer(0,IID_PPV_ARGS(&back)));o->context->CopyResource(back.Get(),o->last.Get());o->externalBackBufferReady=true;}
+  ++o->externalPresentCalls;++o->externalRetryCalls;
+  HRESULT hr=o->swap->Present(0,DXGI_PRESENT_DO_NOT_WAIT);RecordExternalPresent(o,hr);return hr;
+ }catch(HRESULT hr){return hr;}
+}
+// Bounded diagnostic counters and a real WM_PAINT invalidation for regression checks.
+extern "C" __declspec(dllexport) int __cdecl canvas_output_diagnostics(void* handle,unsigned long long* presents,unsigned long long* retries){
+ auto o=(Output*)handle;if(!o||!presents||!retries)return E_INVALIDARG;*presents=o->externalPresentCalls;*retries=o->externalRetryCalls;return S_OK;
+}
+extern "C" __declspec(dllexport) int __cdecl canvas_output_invalidate_test(void* handle){
+ auto o=(Output*)handle;if(!o||!o->window)return E_INVALIDARG;InvalidateRect(o->window,nullptr,FALSE);UpdateWindow(o->window);return S_OK;
+}
+
+extern "C" __declspec(dllexport) int __cdecl canvas_output_visibility_test(void* handle,int visible){
+ auto o=(Output*)handle;if(!o||!o->window)return E_INVALIDARG;ShowWindow(o->window,visible?SW_SHOWNOACTIVATE:SW_HIDE);return S_OK;
 }
 
 extern "C" __declspec(dllexport) int __cdecl canvas_output_error(void* handle){auto o=(Output*)handle;if(o&&o->displayTracked&&!OutputDisplayConnected(o))HideDisconnectedOutput(o);return o?o->externalError:E_INVALIDARG;}

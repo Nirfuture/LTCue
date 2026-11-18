@@ -40,9 +40,9 @@ await Test("input fault during dispatch preserves previously adopted frame and c
  Check(fired&&held,"fault hold missing");
 });
 await Test("brief startup preparation catches up without extra recovery decoder",async()=>{
- MediaDecoder.PreparationMs=100;var clock=new MasterClock(TimecodeRate.Modes[1],10);Accept(clock,5);using var stop=new CancellationTokenSource(TimeSpan.FromSeconds(1));bool ready=false;int seeks=0,recoveries=0;
- try{await new ProgramPlayback(new()).RunAsync([new(Guid.NewGuid(),"fixture.mp4",0,20,25,"h264")],new(),clock,0,p=>{recoveries=Math.Max(recoveries,p.RecoveryAttempts);seeks=Math.Max(seeks,p.Seeks);if(p.FramePts!=null&&p.LagSeconds<.1)ready=true;},stop.Token,presentation:new RecordingPresentation(_=>{}));}catch(OperationCanceledException)when(stop.IsCancellationRequested){}
- Check(ready&&recoveries==0&&seeks==1,"brief preparation triggered redundant recovery");
+ MediaDecoder.PreparationMs=100;var clock=new MasterClock(TimecodeRate.Modes[1],10);Accept(clock,5);using var stop=new CancellationTokenSource(TimeSpan.FromSeconds(1));bool ready=false;int seeks=0,recoveries=0,refreshes=0,delivered=0;VideoFrame? last=null;
+ try{await new ProgramPlayback(new()).RunAsync([new(Guid.NewGuid(),"fixture.mp4",0,20,25,"h264")],new(),clock,0,p=>{recoveries=Math.Max(recoveries,p.RecoveryAttempts);seeks=Math.Max(seeks,p.Seeks);if(p.FramePts!=null&&p.LagSeconds<.1)ready=true;},stop.Token,presentation:new RecordingPresentation(frame=>{Check(!ReferenceEquals(last,frame),"same decoded frame submitted twice");last=frame;delivered++;},()=>refreshes++));}catch(OperationCanceledException)when(stop.IsCancellationRequested){}
+ Check(ready&&recoveries==0&&seeks==1,"brief preparation triggered redundant recovery");Check(delivered>2&&refreshes>0,"deduplication stopped frames or refresh");
 });
 await Test("slow startup still invokes bounded recovery and preserves source",async()=>{
  MediaDecoder.PreparationMs=500;var clock=new MasterClock(TimecodeRate.Modes[1],10);Accept(clock,0);using var stop=new CancellationTokenSource(TimeSpan.FromSeconds(3));int recoveries=0;bool ready=false;
@@ -56,4 +56,4 @@ await Test("preloaded old source revision is not promoted by matching cue ID",as
  Check(arrived,"new source not presented");
 });
 string path=args.FirstOrDefault()??"results.json";File.WriteAllText(path,JsonSerializer.Serialize(results,new JsonSerializerOptions{WriteIndented=true}));Console.WriteLine($"{results.Count} checks; failures={failed}");return failed?1:0;
-sealed class RecordingPresentation(Action<VideoFrame> present):IProgramPresentation{public void Present(VideoFrame frame)=>present(frame);public void Refresh(){}public void Dispose(){}}
+sealed class RecordingPresentation(Action<VideoFrame> present,Action? refresh=null):IProgramPresentation{public void Present(VideoFrame frame)=>present(frame);public void Refresh()=>refresh?.Invoke();public void Dispose(){}}

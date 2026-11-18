@@ -23,6 +23,9 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
     internal Func<int,int>? PreviewResultForTest { get; set; }
     internal Func<int>? DeviceReasonForTest { get; set; }
     internal Func<int,int>? ExternalErrorForTest { get; set; }
+    internal (ulong Presents,ulong Retries) ExternalPresentCountsForTest(){Access();Check(N.canvas_output_diagnostics(handle,out var presents,out var retries));return(presents,retries);}
+    internal void SetOutputVisibilityForTest(bool visible){Access();Check(N.canvas_output_visibility_test(handle,visible?1:0));}
+    internal void InvalidateOutputForTest(){Access();Check(N.canvas_output_invalidate_test(handle));}
     internal void SimulateDisplayChangeForTest(){Access();Check(N.canvas_display_change_test(handle));}
 #endif
     public RenderSession(int width, int height)
@@ -99,13 +102,22 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
 
     public void RefreshOutput()
     {
-        Access(); if(!OutputAttached)return;
+        if(CheckOutputHealth())RetryPendingPresentation();
+    }
+    public bool CheckOutputHealth()
+    {
+        Access(); if(!OutputAttached)return false;
         int error=N.canvas_output_error(handle);
 #if VERIFICATION
         error=ExternalErrorForTest?.Invoke(error)??error;
 #endif
-        if(error==unchecked((int)0x8007048F)){OutputDisconnected=true;return;}
+        if(error==unchecked((int)0x8007048F)){OutputDisconnected=true;return false;}
         if(error<0){CheckDevice(error);throw new IOException($"映像出力エラー（0x{error:X8}）");}
+        return true;
+    }
+    public void RetryPendingPresentation()
+    {
+        Access();if(!OutputAttached||OutputDisconnected)return;
         int hr=N.canvas_output_refresh(handle);
         if(hr==unchecked((int)0x887A000A))return; // DXGI_ERROR_WAS_STILL_DRAWING: keep latest image.
         if(hr==unchecked((int)0x8007048F)){OutputDisconnected=true;return;}
@@ -134,6 +146,11 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
     void Check(int hr) { if(hr>=0)return;CheckDevice(hr);throw new IOException($"GPU canvas failure: 0x{hr:X8}"); }
     static class N
     {
+#if VERIFICATION
+        [DllImport("PlayerNative.dll",CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_output_diagnostics(nint handle,out ulong presents,out ulong retries);
+        [DllImport("PlayerNative.dll",CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_output_visibility_test(nint handle,int visible);
+        [DllImport("PlayerNative.dll",CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_output_invalidate_test(nint handle);
+#endif
         [DllImport("PlayerNative.dll", CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_output_refresh(nint handle);
         [DllImport("PlayerNative.dll", CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_output_error(nint handle);
         [DllImport("PlayerNative.dll", CallingConvention=CallingConvention.Cdecl)] internal static extern int output_presentation_mode(nint handle);
