@@ -1,6 +1,7 @@
 {
   "Version": 1,
   "Suites": [
+    {"Name":"cue-format","Count":6,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"},
     {"Name":"cover-pacing","Count":12,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"},
     {"Name":"display-columns","Count":8,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"},
     {"Name":"ui-copy","Count":7,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"},
