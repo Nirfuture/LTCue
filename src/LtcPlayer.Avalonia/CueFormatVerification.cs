@@ -48,7 +48,11 @@ public static class CueFormatVerification
    });
    await Test("dimensions mode stays fixed and metadata and new rows do not resize",async()=>{
     await Set(new(){Mode=CueResolutionMode.Dimensions});Check(Math.Abs(column.ActualWidth-150)<1,"dimensions width");
-    row.PixelWidth=3840;row.PixelHeight=2160;Check(row.ResolutionDisplay=="3840×2160"&&row.FormatTooltip=="HAP · 3840×2160","metadata stale");
+    row.PixelWidth=3840;row.PixelHeight=2160;Check(row.ResolutionDisplay=="3840×2160"&&row.ResolutionTooltip=="3840×2160"&&row.ContainerDisplay=="MOV","metadata stale");
+    await Task.Delay(50);
+    var codecCell=grid.GetVisualDescendants().OfType<TextBlock>().Single(t=>t.Text=="HAP");
+    var resolutionCell=grid.GetVisualDescendants().OfType<TextBlock>().Single(t=>t.Text=="3840×2160");
+    Check(Equals(ToolTip.GetTip(codecCell),"MOV")&&Equals(ToolTip.GetTip(resolutionCell),"3840×2160"),"column tooltip bindings");
     w.Editor.Add(new(){FilePath="portrait.mov",Codec="HAP",PixelWidth=1080,PixelHeight=1920});await Task.Delay(100);
     Check(w.Editor.Rows.Last().ResolutionDisplay=="1080×1920"&&Math.Abs(column.ActualWidth-150)<1,"new row settings/width");
    });

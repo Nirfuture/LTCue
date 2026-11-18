@@ -176,10 +176,11 @@ await Test("cue format validates dimensions duplicate rows and labels", () => Ru
     new CueFormatPreferences{Presets=[]}.Validate();
 }));
 await Test("cue format updates notify bindings and replacement clears stale dimensions", () => Run(() => {
-    var row=new CueRow{FilePath="old",Codec="HAP",PixelWidth=1920,PixelHeight=1080};var names=new List<string?>();row.PropertyChanged+=(_,e)=>names.Add(e.PropertyName);
-    row.PixelWidth=1980;Check(row.ResolutionDisplay=="未登録"&&names.Contains("ResolutionDisplay")&&names.Contains("FormatTooltip"),"metadata notifications");
+    var row=new CueRow{FilePath="old.MoV",Codec="HAP",PixelWidth=1920,PixelHeight=1080};var names=new List<string?>();row.PropertyChanged+=(_,e)=>names.Add(e.PropertyName);
+    row.PixelWidth=1980;Check(row.ResolutionDisplay=="未登録"&&names.Contains("ResolutionDisplay")&&names.Contains("ResolutionTooltip")&&row.ResolutionTooltip=="1980×1080"&&row.ContainerDisplay=="MOV","metadata notifications");
     row.FormatPreferences=new(){Presets=[new(1980,1080,"LED")]};Check(row.ResolutionDisplay=="LED","settings notification");
-    row.FilePath="replacement";Check(row.PixelWidth==0&&row.PixelHeight==0&&row.ResolutionDisplay=="","stale dimensions");
+    row.FilePath="replacement.mp4";Check(row.PixelWidth==0&&row.PixelHeight==0&&row.ResolutionDisplay==""&&row.ResolutionTooltip==""&&row.ContainerDisplay=="MP4"&&names.Contains("ContainerDisplay"),"replacement tooltip metadata");
+    row.FilePath="no-extension";Check(row.ContainerDisplay=="","missing extension");
 }));
 await Test("cue format legacy defaults and explicit empty presets survive persistence", () => Run(() => {
     string file=Path.Combine(Path.GetTempPath(),"ltcue-format-"+Guid.NewGuid().ToString("N")+".json");

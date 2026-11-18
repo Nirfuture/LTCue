@@ -6,7 +6,7 @@ public sealed class CueRow : INotifyPropertyChanged
 {
     public Guid CueId{get;set;}=Guid.NewGuid();
     private string path="",hours="00",minutes="00",seconds="00",frames="00",warning="",error="";private bool enabled=true;
-    public string FilePath{get=>path;set{if(path==value)return;path=value;SourceRevision=Interlocked.Increment(ref nextSourceRevision);Duration=FrameRate=0;PixelWidth=PixelHeight=0;Codec="";SourceError="";AudioIssue="";Changed();Changed(nameof(Name));}}
+    public string FilePath{get=>path;set{if(path==value)return;path=value;SourceRevision=Interlocked.Increment(ref nextSourceRevision);Duration=FrameRate=0;PixelWidth=PixelHeight=0;Codec="";SourceError="";AudioIssue="";Changed();Changed(nameof(Name));Changed(nameof(ContainerDisplay));}}
     public string Name { get { try{return Path.GetFileName(FilePath);}catch(ArgumentException){return FilePath;} } }
     public string Hours{get=>hours;set{hours=value;Changed();}}
     public string Minutes{get=>minutes;set{minutes=value;Changed();}}
@@ -31,8 +31,9 @@ public sealed class CueRow : INotifyPropertyChanged
     CueFormatPreferences formatPreferences=new();
     public CueFormatPreferences FormatPreferences{get=>formatPreferences;set{formatPreferences=value;FormatChanged();}}
     public string ResolutionDisplay=>formatPreferences.Resolution(PixelWidth,PixelHeight);
-    public string FormatTooltip=>formatPreferences.Format(Codec,PixelWidth,PixelHeight,true);
-    void FormatChanged(){Changed(nameof(ResolutionDisplay));Changed(nameof(FormatTooltip));}
+    public string ContainerDisplay { get { try{return Path.GetExtension(FilePath).TrimStart('.').ToUpperInvariant();}catch(ArgumentException){return "";} } }
+    public string ResolutionTooltip=>PixelWidth>0&&PixelHeight>0?$"{PixelWidth}×{PixelHeight}":"";
+    void FormatChanged(){Changed(nameof(ResolutionDisplay));Changed(nameof(ResolutionTooltip));}
     public int PixelWidth{get=>pixelWidth;set{if(pixelWidth==value)return;pixelWidth=value;Changed();FormatChanged();}}
     public int PixelHeight{get=>pixelHeight;set{if(pixelHeight==value)return;pixelHeight=value;Changed();FormatChanged();}}
     public double Duration{get;set;}
