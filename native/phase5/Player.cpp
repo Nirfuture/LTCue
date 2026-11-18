@@ -37,6 +37,7 @@ struct Output {
     ComPtr<ID3D11Device> device; ComPtr<ID3D11DeviceContext> context;
     bool externalPresentPending=false,externalBackBufferReady=false,externalOccluded=false;
     unsigned long long externalPresentCalls=0,externalRetryCalls=0;
+    LONGLONG compositionTicks=0,presentTicks=0;
     ComPtr<IDXGISwapChain> swap; ComPtr<ID3D11Texture2D> upload;
     ComPtr<ID3D11Texture2D> compressed,rendered,last;
     ComPtr<ID3D11ShaderResourceView> compressedView;
