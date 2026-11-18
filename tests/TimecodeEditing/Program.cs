@@ -12,6 +12,21 @@ CueTimecodeSource[] Capture(params CueRow[] rows) => rows.Select(CueTimecodeSour
 var rate = TimecodeRate.Modes.Single(r => r.Name == "25");
 var df = TimecodeRate.Modes.Single(r => r.Name == "29.97 DF");
 
+await Test("overlap summary counts peers and clears after edits", () => Run(() => {
+    var editor = new ShowEditor { Rate = rate };
+    var rows = Enumerable.Range(0,4).Select(i => Row($"clip{i}.mov",$"00:00:0{i}:00")).ToArray();
+    foreach(var row in rows) editor.Add(row);
+    Check(rows.All(r => r.Warning == "再生区間の重複（3件）"), "overlap count or repeated text");
+    Check(rows[0].OverlapDetails == "重複相手：#2 clip1.mov、#3 clip2.mov、#4 clip3.mov", "peer details");
+    Check(rows[0].IssueTooltip.Contains(rows[0].Warning) && rows.All(r => !r.HasError) && editor.Timeline.Length == 4, "warning semantics");
+    rows[3].Enabled = false;
+    Check(rows[0].Warning == "再生区間の重複（2件）" && rows[3].OverlapDetails == "", "disabled peer retained");
+    rows[2].SetStart(rows[1].StartTimecode); editor.Validate();
+    Check(rows[1].Error == "開始TC重複" && rows[2].Error == "開始TC重複" && editor.Timeline.Length == 1, "duplicate exclusion changed");
+    Check(rows.All(r => r.Warning == "" && r.OverlapDetails == ""), "stale overlap details");
+    rows[2].SetStart("00:00:20:00"); rows[1].SetStart("00:00:10:00"); editor.Validate();
+    Check(rows.All(r => r.Warning == "" && r.OverlapDetails == ""), "touching intervals overlap");
+}));
 await Test("TC formatter has independent DF boundary expectations", () => Run(() => {
     foreach (var pair in new (long Frames, string Label)[] { (0,"00:00:00;00"),(1799,"00:00:59;29"),(1800,"00:01:00;02"),(17982,"00:10:00;00"),(107892,"01:00:00;00"),(2589407,"23:59:59;29") })
         Check(df.FormatFrames(pair.Frames) == pair.Label, pair.Label);

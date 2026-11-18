@@ -26,7 +26,7 @@ public sealed class ShowEditor
   ScheduledCue[]? next=null;
   try{
    var result=ShowProgramService.Evaluate(Rows,Rate);
-   foreach(var item in result.Rows){item.Row.Error=item.Error;item.Row.Warning=item.Warning;}
+   foreach(var item in result.Rows){item.Row.Error=item.Error;item.Row.Warning=item.Warning;item.Row.OverlapDetails=item.OverlapDetails;}
    Timeline=result.Timeline.ToArray();
    CanArm=true;ValidationMessage="";
    next=Timeline.OrderBy(c=>c.Start).ThenBy(c=>c.CueId).ToArray();

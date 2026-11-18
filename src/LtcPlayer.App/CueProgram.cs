@@ -13,18 +13,21 @@ public sealed class CueRow : INotifyPropertyChanged
     public string Seconds{get=>seconds;set{seconds=value;Changed();}}
     public string Frames{get=>frames;set{frames=value;Changed();}}
     public bool Enabled{get=>enabled;set{enabled=value;Changed();}}
-    public string Warning{get=>warning;set{warning=value;Changed();Changed(nameof(WarningMark));Changed(nameof(IssueText));}}
+    public string Warning{get=>warning;set{warning=value;Changed();Changed(nameof(WarningMark));Changed(nameof(IssueText));Changed(nameof(IssueTooltip));}}
     public string WarningMark=>Warning==""?"":"⚠";
-    public string Error{get=>error;set{error=value;Changed();Changed(nameof(IssueText));Changed(nameof(HasError));}}
+    public string Error{get=>error;set{error=value;Changed();Changed(nameof(IssueText));Changed(nameof(IssueTooltip));Changed(nameof(HasError));}}
     string sourceError="";
     static int nextSourceRevision;
     public int SourceRevision {get;private set;}=Interlocked.Increment(ref nextSourceRevision);
     public int MaterialStatusRevision{get;private set;}
-    public string SourceError {get=>sourceError;set{if(sourceError==value)return;sourceError=value;MaterialStatusRevision++;Changed();Changed(nameof(IssueText));Changed(nameof(HasError));}}
+    public string SourceError {get=>sourceError;set{if(sourceError==value)return;sourceError=value;MaterialStatusRevision++;Changed();Changed(nameof(IssueText));Changed(nameof(IssueTooltip));Changed(nameof(HasError));}}
     string audioIssue="";
-    public string AudioIssue{get=>audioIssue;set{audioIssue=value;Changed();Changed(nameof(HasError));Changed(nameof(IssueText));}}
+    public string AudioIssue{get=>audioIssue;set{audioIssue=value;Changed();Changed(nameof(HasError));Changed(nameof(IssueText));Changed(nameof(IssueTooltip));}}
     public bool HasError=>Error!=""||SourceError!=""||AudioIssue!="";
     public string IssueText=>string.Join(" / ",new[]{(Error!=""||SourceError!="")?(Enabled?"同期対象外：":"無効／")+string.Join(" / ",new[]{Error,SourceError}.Where(x=>x!="")):"",AudioIssue!=""?"音声エラー："+AudioIssue:"",Warning}.Where(x=>!string.IsNullOrWhiteSpace(x)));
+    string overlapDetails="";
+    public string OverlapDetails{get=>overlapDetails;set{overlapDetails=value;Changed();Changed(nameof(IssueTooltip));}}
+    public string IssueTooltip=>string.Join("\n",new[]{IssueText,OverlapDetails}.Where(x=>!string.IsNullOrWhiteSpace(x)));
     public void ClearSourceError(){if(SourceError!=""){SourceRevision=Interlocked.Increment(ref nextSourceRevision);SourceError="";}}
     public void AcceptMedia(MediaInfo info){PixelWidth=info.Width;PixelHeight=info.Height;Duration=info.Duration;FrameRate=info.FrameRate;Codec=info.Codec;AudioIssue="";SourceRevision=Interlocked.Increment(ref nextSourceRevision);SourceError="";Changed(nameof(Duration));Changed(nameof(FrameRate));Changed(nameof(Codec));}
     int pixelWidth,pixelHeight;string codec="";
@@ -48,7 +51,8 @@ public sealed class CueRow : INotifyPropertyChanged
 }
 public record ScheduledCue(Guid CueId,string FilePath,double Start,double Duration,double FrameRate,string Codec)
 { public int SourceRevision{get;init;} public bool CanStart{get;init;}=true; }
-public record CueValidation(CueRow Row,string Error,string Warning);
+public record CueValidation(CueRow Row,string Error,string Warning)
+{ public string OverlapDetails{get;init;}=""; }
 public record ProgramValidation(List<ScheduledCue> Timeline,List<CueValidation> Rows);
 public sealed class CueScheduler
 {
@@ -95,16 +99,20 @@ public static class ShowProgramService
                 timeline.Add(new(row.CueId,row.FilePath,starts[row.CueId],row.Duration,row.FrameRate,row.Codec){SourceRevision=row.SourceRevision,CanStart=row.SourceError==""});
         }
         var ready=timeline.Where(c=>c.CanStart).ToArray();
+        var overlaps=new Dictionary<Guid,HashSet<Guid>>();
+        void AddOverlap(Guid id,Guid other){if(!overlaps.TryGetValue(id,out var peers))overlaps[id]=peers=[];peers.Add(other);}
         for(int i=0;i<ready.Length;i++)for(int j=i+1;j<ready.Length;j++){
             var a=ready[i];var b=ready[j];double overlap=Math.Min(a.Start+a.Duration,b.Start+b.Duration)-Math.Max(a.Start,b.Start);
-            if(overlap>0){warnings[a.CueId]=warnings.GetValueOrDefault(a.CueId,"")+"再生区間の重複。 ";warnings[b.CueId]=warnings.GetValueOrDefault(b.CueId,"")+"再生区間の重複。 ";}
+            if(overlap>0){AddOverlap(a.CueId,b.CueId);AddOverlap(b.CueId,a.CueId);}
         }
-        return new(timeline,rows.Select(r=>new CueValidation(r,errors.GetValueOrDefault(r.CueId,""),warnings.GetValueOrDefault(r.CueId,""))).ToList());
+        foreach(var pair in overlaps)warnings[pair.Key]=$"再生区間の重複（{pair.Value.Count}件）";
+        string Details(Guid id)=>overlaps.TryGetValue(id,out var peers)?"重複相手："+string.Join("、",rows.Select((row,index)=>(row,index)).Where(x=>peers.Contains(x.row.CueId)).Select(x=>$"#{x.index+1} {x.row.Name}")):"";
+        return new(timeline,rows.Select(r=>new CueValidation(r,errors.GetValueOrDefault(r.CueId,""),warnings.GetValueOrDefault(r.CueId,"")){OverlapDetails=Details(r.CueId)}).ToList());
     }
     public static List<ScheduledCue> Validate(IList<CueRow> rows,TimecodeRate rate)
     {
         var result=Evaluate(rows,rate);
-        foreach(var item in result.Rows){item.Row.Error=item.Error;item.Row.Warning=item.Warning;}
+        foreach(var item in result.Rows){item.Row.Error=item.Error;item.Row.Warning=item.Warning;item.Row.OverlapDetails=item.OverlapDetails;}
         return result.Timeline.Where(c=>c.CanStart).ToList();
     }
     public static async Task RefreshAsync(CueRow row,CancellationToken token)
