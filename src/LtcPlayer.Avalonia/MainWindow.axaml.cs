@@ -84,6 +84,8 @@ public partial class MainWindow : Window
    presentationReady=true;StartMaterialMonitor();
 #if VERIFICATION
    if(Program.Option("--verify-cue-format") is {} formatFolder){await CueFormatVerification.RunAsync(this,formatFolder);return;}
+   if(Program.Option("--verify-cover-pacing") is {} pacingFolder)await CoverPacingVerification.RunAsync(this,pacingFolder);
+   if(Program.Option("--verify-cover-toggle-profile") is {} coverProfileFolder)await CoverToggleVerification.RunAsync(this,coverProfileFolder);
    if(Program.Option("--verify-timecode-editing") is {} timecodesFolder)await TimecodeEditingVerification.RunAsync(this,timecodesFolder);
    if(Program.Option("--verify-display-columns") is {} columnsFolder)await DisplayColumnsVerification.RunAsync(this,columnsFolder);
    if(Program.Option("--verify-ui-copy") is {} copyFolder)await UiCopyVerification.RunAsync(this,copyFolder);

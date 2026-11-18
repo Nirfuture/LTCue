@@ -19,6 +19,7 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
     public int PreviewError { get; private set; }
     public int SharedDeviceError { get; private set; }
 #if VERIFICATION
+    internal (double Composition,double Present) TimingForTest(){Access();Check(N.canvas_timing(handle,out var composition,out var present));return(composition,present);}
     internal Action<CoverImage?>? CoverPrepareForTest{get;set;}
     internal Func<int,int>? PreviewResultForTest { get; set; }
     internal Func<int>? DeviceReasonForTest { get; set; }
@@ -147,6 +148,7 @@ public sealed class RenderSession : IDisposable, ICoverRenderer
     static class N
     {
 #if VERIFICATION
+        [DllImport("PlayerNative.dll",CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_timing(nint handle,out double composition,out double present);
         [DllImport("PlayerNative.dll",CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_output_diagnostics(nint handle,out ulong presents,out ulong retries);
         [DllImport("PlayerNative.dll",CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_output_visibility_test(nint handle,int visible);
         [DllImport("PlayerNative.dll",CallingConvention=CallingConvention.Cdecl)] internal static extern int canvas_output_invalidate_test(nint handle);

@@ -17,6 +17,13 @@ public sealed class PreviewHost : NativeControlHost, ICoverRenderer
     bool borrowedForVerification;
     int width=1920, height=1080;
     CoverBinding coverBinding=new();
+    // A frame already samples the current cover. Let the next video submission
+    // consume further changes before spending another synchronous output slot.
+    // Use completion time: Present may itself have waited for a display refresh.
+    // No source/playing flag is needed; stalled and low-rate sources fall back
+    // to the regular timer once this short coalescing window expires.
+    double coverRefreshAfter;
+    const double CoverCoalescingSeconds=1.0/60;
     internal CoverController? Cover { get; set; }
     public RenderSession Canvas => canvas ?? throw new InvalidOperationException("Canvas is not ready");
     public (int Width,int Height) CanvasSize => (width,height);
@@ -104,10 +111,15 @@ public sealed class PreviewHost : NativeControlHost, ICoverRenderer
         if(Cover!=null)coverBinding.Apply(Cover,Canvas);
         Canvas.Redraw();Canvas.RefreshOutput();
     }
-    internal void RefreshCover()
+    internal void RefreshCover(string source="timer")
     {
         if(!Ready||Canvas.SharedDeviceError<0)return;
-        if(Cover!=null&&coverBinding.Apply(Cover,Canvas))Canvas.Redraw();
+#if VERIFICATION
+        using var measurement=PresentationTimingVerification.Measure(Canvas,source);
+#endif
+        if(MasterClock.Timestamp()>=coverRefreshAfter&&Cover!=null&&coverBinding.Apply(Cover,Canvas)){
+            Canvas.Redraw();coverRefreshAfter=MasterClock.Timestamp()+CoverCoalescingSeconds;
+        }
         Canvas.UpdatePreview();
         if(Canvas.CheckOutputHealth())Canvas.RetryPendingPresentation();
     }
@@ -135,8 +147,12 @@ public sealed class PreviewHost : NativeControlHost, ICoverRenderer
     public void Present(VideoFrame frame)
     {
         Dispatcher.UIThread.VerifyAccess();
+#if VERIFICATION
+        using var measurement=PresentationTimingVerification.Measure(Canvas,"video");
+#endif
         if(Cover!=null)coverBinding.Apply(Cover,Canvas);
         Canvas.Present(frame);Presents++;
+        coverRefreshAfter=MasterClock.Timestamp()+CoverCoalescingSeconds;
     }
     public void Black(){if(Ready)Present(new(new byte[checked(width*height*4)],0));}
     public byte[] Readback()=>Canvas.PreviewReadback();

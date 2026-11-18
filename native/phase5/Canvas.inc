@@ -76,3 +76,11 @@ extern "C" __declspec(dllexport) int __cdecl canvas_display_change_test(void* ha
  return !IsWindowVisible(o->window)&&o->externalError==HRESULT_FROM_WIN32(ERROR_DEVICE_NOT_CONNECTED)?S_OK:E_FAIL;
 }
 extern "C" __declspec(dllexport) int __cdecl canvas_device_error(void* handle){auto o=(Output*)handle;return o&&o->device?o->device->GetDeviceRemovedReason():E_INVALIDARG;}
+
+// CPU elapsed time around composition command submission and synchronous Present;
+// these are not GPU timestamp queries or physical display counts.
+extern "C" __declspec(dllexport) int __cdecl canvas_timing(void* handle,double* composition,double* present){
+ auto o=(Output*)handle;if(!o||!composition||!present)return E_INVALIDARG;
+ LARGE_INTEGER frequency;QueryPerformanceFrequency(&frequency);
+ *composition=o->compositionTicks*1000.0/frequency.QuadPart;*present=o->presentTicks*1000.0/frequency.QuadPart;return S_OK;
+}

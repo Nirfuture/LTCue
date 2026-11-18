@@ -23,6 +23,7 @@ float4 PS(V v):SV_TARGET{float2 uv=(v.uv-.5)*coverFactor+.5;float3 c=0;
 static int PresentComposite(Output* o){
  if(!o->baseImage)return S_FALSE;
  try{
+  LARGE_INTEGER began,composed;QueryPerformanceCounter(&began);
   ComPtr<ID3D11Texture2D> result=o->baseImage;
   if(o->coverMix>0){
    PrepareComposite(o);ComPtr<ID3D11ShaderResourceView> video;Check(o->device->CreateShaderResourceView(o->baseImage.Get(),nullptr,&video));
@@ -34,11 +35,13 @@ static int PresentComposite(Output* o){
    auto sampler=o->compositeSampler.Get();o->context->PSSetSamplers(0,1,&sampler);auto cb=o->compositeConstants.Get();o->context->PSSetConstantBuffers(0,1,&cb);o->context->Draw(3,0);
    ID3D11ShaderResourceView* clear[2]={};o->context->PSSetShaderResources(0,2,clear);o->context->OMSetRenderTargets(0,nullptr,nullptr);result=o->compositeImage;
   }
+  QueryPerformanceCounter(&composed);o->compositionTicks+=composed.QuadPart-began.QuadPart;
   o->last=result;o->externalPresentPending=true;o->externalBackBufferReady=false;
   if(!o->swap||(o->offscreen&&o->externalError<0))return S_OK;
   try{
    ComPtr<ID3D11Texture2D> back;Check(o->swap->GetBuffer(0,IID_PPV_ARGS(&back)));o->context->CopyResource(back.Get(),result.Get());o->externalBackBufferReady=true;++o->externalPresentCalls;
-   HRESULT hr=o->swap->Present(o->embedded?0:1,0);RecordExternalPresent(o,hr);
+   LARGE_INTEGER before,after;QueryPerformanceCounter(&before);
+   HRESULT hr=o->swap->Present(o->embedded?0:1,0);QueryPerformanceCounter(&after);o->presentTicks+=after.QuadPart-before.QuadPart;RecordExternalPresent(o,hr);
    if(o->offscreen&&FAILED(hr)){o->externalError=hr;return S_OK;}return hr;
   }catch(HRESULT hr){if(o->offscreen){o->externalError=hr;return S_OK;}throw;}
  }catch(HRESULT hr){return hr;}
