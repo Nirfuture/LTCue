@@ -15,7 +15,7 @@ public partial class MainWindow : Window
  internal PreviewPlayer Preview=null!;
  internal PreviewHost Surface=>Control<PreviewHost>("PreviewSurface");
  readonly DispatcherTimer timer=new(){Interval=TimeSpan.FromMilliseconds(100)};
- InputSettings settings=new();bool busy,outputSessionActive,closeAllowed,closing,updatingSeek,dragging,scrubbing;
+ InputSettings settings=new();bool busy,outputSessionActive,closeAllowed,closing,updatingSeek,dragging,scrubbing,seeking;
  CancellationTokenSource? productionCancel;
  TaskCompletionSource? armPrepared;
  ProgramObservation? observation;
@@ -47,14 +47,19 @@ public partial class MainWindow : Window
   Grid.AddHandler(PointerMovedEvent,HandleMoved,RoutingStrategies.Tunnel,true);
   Grid.AddHandler(PointerReleasedEvent,HandleReleased,RoutingStrategies.Tunnel,true);
   var seek=Control<Slider>("Seek");
-  void Scrub(PointerEventArgs e){double x=e.GetPosition(seek).X;seek.Value=Math.Clamp((x-5)/Math.Max(1,seek.Bounds.Width-10),0,1)*seek.Maximum;}
+  void Scrub(PointerEventArgs e){double x=e.GetPosition(seek).X;seek.Value=SeekPositionAt(x);UpdateSeekTooltip(x);ToolTip.SetIsOpen(seek,true);}
+  seek.PointerEntered+=(_,e)=>UpdateSeekTooltip(e.GetPosition(seek).X);
+  seek.PointerExited+=(_,_)=>{if(!scrubbing)UpdateSeekTooltip(null);};
+  // The hover service may close the tooltip on press, timeout, or pointer exit.
+  // Pointer capture keeps the target time visible until the scrub ends.
+  seek.PropertyChanged+=(_,e)=>{if(e.Property==ToolTip.IsOpenProperty&&scrubbing&&!ToolTip.GetIsOpen(seek))Dispatcher.UIThread.Post(()=>{if(scrubbing)ToolTip.SetIsOpen(seek,true);});};
   seek.AddHandler(KeyDownEvent,(_,e)=>{if(e.Key is Key.Left or Key.Right or Key.Home or Key.End or Key.PageUp or Key.PageDown){if(SeekAccess.Allowed)keyboardSeeking=true;else e.Handled=true;}},RoutingStrategies.Tunnel);
-  seek.PointerCaptureLost+=(_,_)=>{scrubbing=false;seekPointer=null;};
+  seek.PointerCaptureLost+=(_,_)=>{scrubbing=false;seekPointer=null;ToolTip.SetIsOpen(seek,false);};
   seek.LostFocus+=(_,_)=>{keyboardSeeking=false;};
   Deactivated+=(_,_)=>CancelScrub();
   seek.AddHandler(PointerPressedEvent,(_,e)=>{if(!SeekAccess.Allowed||!e.GetCurrentPoint(seek).Properties.IsLeftButtonPressed)return;scrubbing=true;seekPointer=e.Pointer;e.Pointer.Capture(seek);Scrub(e);e.Handled=true;},RoutingStrategies.Tunnel,true);
-  seek.AddHandler(PointerMovedEvent,(_,e)=>{if(scrubbing){Scrub(e);e.Handled=true;}},RoutingStrategies.Tunnel,true);
-  seek.AddHandler(PointerReleasedEvent,async(_,e)=>{if(!scrubbing)return;Scrub(e);scrubbing=false;seekPointer=null;e.Pointer.Capture(null);e.Handled=true;await SeekAsync();},RoutingStrategies.Tunnel,true);
+  seek.AddHandler(PointerMovedEvent,(_,e)=>{UpdateSeekTooltip(e.GetPosition(seek).X);if(scrubbing){Scrub(e);e.Handled=true;}},RoutingStrategies.Tunnel,true);
+  seek.AddHandler(PointerReleasedEvent,async(_,e)=>{if(!scrubbing)return;Scrub(e);scrubbing=false;seekPointer=null;ToolTip.SetIsOpen(seek,false);e.Pointer.Capture(null);e.Handled=true;await SeekAsync();},RoutingStrategies.Tunnel,true);
   timer.Tick+=async(_,_)=>{TickStatus();await UpdateAutoPreviewAsync();};
   AddHandler(KeyDownEvent,async(_,e)=>{if(e.Key==Key.Escape){e.Handled=true;if(columnResize!=null){FinishColumnResize();return;}if(FocusManager?.GetFocusedElement() is TextBox box&&box.Classes.Contains("timecode")){CancelTimecodeEdit();FocusManager.ClearFocus();return;}if(dragged!=null){CancelCueDrag();return;}if(outputSessionActive)await Safe(async()=>{await RequestStopAsync(false);});else if(!LtcHasPriority&&!SyncOwnsSurface)await Safe(()=>Preview.StopAsync());}},RoutingStrategies.Tunnel);
   Opened+=async(_,_)=>await InitializeAsync();
@@ -170,7 +175,7 @@ public partial class MainWindow : Window
  }
  void UpdateSeekPosition(double position,double duration)
  {
-  if(scrubbing||keyboardSeeking)return;
+  if(scrubbing||keyboardSeeking||seeking&&!SyncOwnsSurface&&!LtcHasPriority)return;
   updatingSeek=true;
   try{
    var slider=Control<Slider>("Seek");slider.Maximum=Math.Max(.001,duration);
@@ -217,7 +222,26 @@ public partial class MainWindow : Window
   if(!CanEditProgram)return;var files=await StorageProvider.OpenFilePickerAsync(new(){Title="キューリストを開く",FileTypeFilter=[new("キューリスト"){Patterns=["*.json"]}]});
   if(files.FirstOrDefault()?.TryGetLocalPath() is {} path)await Edit(async()=>{var load=await ShowProgramService.LoadAsync(path,CancellationToken.None,Preview.Analysis);if(!DefinitionAuthority)return;if(SyncOwnsSurface){if(!await playback.ClearHeldSourceAsync())return;}else await Preview.ClearAsync();if(!DefinitionAuthority)return;previewCue=null;Editor.Replace(load);});
  }
- internal async Task SeekAsync(){if(!updatingSeek&&SeekAccess.Allowed)await Safe(()=>Preview.SeekAsync(Control<Slider>("Seek").Value));}
+ double? seekHoverX;
+ double SeekPositionAt(double x)
+ {
+  var slider=Control<Slider>("Seek");
+  return Math.Clamp((x-5)/Math.Max(1,slider.Bounds.Width-10),0,1)*slider.Maximum;
+ }
+ internal void UpdateSeekTooltip(double? x)
+ {
+  seekHoverX=x;var slider=Control<Slider>("Seek");var access=SeekAccess;
+  double at=x is {} pointerX?SeekPositionAt(pointerX):slider.Value;
+  at=Math.Clamp(at,0,Math.Max(0,Preview.Snapshot.Duration-1/Math.Max(1,Preview.FrameRate)));
+  ToolTip.SetTip(slider,access.Allowed?MediaTimeDisplay.Format(at,Preview.FrameRate):access.Reason);
+ }
+ internal async Task SeekAsync()
+ {
+  if(updatingSeek||seeking||!SeekAccess.Allowed)return;
+  double target=Control<Slider>("Seek").Value;seeking=true;
+  try{await Safe(()=>Preview.SeekAsync(target));}
+  finally{seeking=false;UpdatePreview(Preview.Snapshot);}
+ }
  async void SeekKeyUp(object? s,KeyEventArgs e){if(e.Key is Key.Left or Key.Right or Key.Home or Key.End or Key.PageUp or Key.PageDown){try{await SeekAsync();}finally{keyboardSeeking=false;UpdatePreview(Preview.Snapshot);}}}
  void HandlePressed(object? sender,PointerPressedEventArgs e){if(ReorderAccess.Allowed&&sender is Control c&&e.GetCurrentPoint(c).Properties.IsLeftButtonPressed){dragged=c.DataContext as CueRow;dragOrigin=e.GetPosition(Grid);dragging=false;cueDragPointer=e.Pointer;e.Pointer.Capture(Grid);e.Handled=true;}}
  void HandleMoved(object? sender,PointerEventArgs e)

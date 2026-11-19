@@ -134,7 +134,7 @@
     },
     {
       "Name": "preview-ui",
-      "Count": 7,
+      "Count": 8,
       "Evidence": "results.json",
       "Kind": "Status",
       "TimeoutSeconds": 120,

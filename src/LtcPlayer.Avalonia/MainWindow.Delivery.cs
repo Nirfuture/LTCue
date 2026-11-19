@@ -65,7 +65,7 @@ public partial class MainWindow
  internal Func<bool,Task<bool>>? ConfirmStopForTest {get;set;}
  internal DeliveryState Delivery=>delivery;
  internal LtcMonitorService Monitor=>monitor;
- void CancelScrub(){scrubbing=false;keyboardSeeking=false;var pointer=seekPointer;seekPointer=null;pointer?.Capture(null);}
+ void CancelScrub(){scrubbing=false;keyboardSeeking=false;ToolTip.SetIsOpen(Control<Slider>("Seek"),false);var pointer=seekPointer;seekPointer=null;pointer?.Capture(null);}
  void TickStatus()
  {
   UpdateAudioUi();

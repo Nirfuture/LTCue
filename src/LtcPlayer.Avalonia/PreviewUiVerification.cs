@@ -43,6 +43,25 @@ public static class PreviewUiVerification
     await w.Preview.LoadAsync(Path.Combine(Program.Option("--fixtures")!,"h264-aac.mp4"));await Task.Delay(150);var before=C<Grid>("PreviewViewport").Bounds;var frame=C<Border>("OutputFrame").Bounds;await w.Preview.PlayAsync();await Task.Delay(100);Check(C<Grid>("PreviewViewport").Bounds==before&&C<Border>("OutputFrame").Bounds==frame,"initial play resized preview");await w.Preview.PauseAsync();
     for(int i=0;i<3;i++){await w.Preview.PlayAsync();await Task.Delay(50);await w.Preview.PauseAsync();Check(C<Grid>("PreviewViewport").Bounds==before&&C<Border>("OutputFrame").Bounds==frame,"play/pause resized preview");}
    });
+   await Test("MP4 seek keeps requested slider position during preparation",async()=>{
+    var seek=C<Slider>("Seek");
+    w.UpdateSeekTooltip(seek.Bounds.Width/2);
+    Check(w.SeekAccess.Allowed&&ToolTip.GetTip(seek)?.ToString()==MediaTimeDisplay.Format(w.Preview.Snapshot.Duration/2,w.Preview.FrameRate),"MP4 seek target tooltip wrong");
+    foreach(bool playing in new[]{false,true}){
+     await w.Preview.SeekAsync(0);if(playing)await w.Preview.PlayAsync();
+     double target=Math.Min(1,w.Preview.Snapshot.Duration/2);seek.Value=target;
+     var positions=new List<double>();
+     void Observe(object? sender,AvaloniaPropertyChangedEventArgs e){if(e.Property==Slider.ValueProperty)positions.Add(seek.Value);}
+     seek.PropertyChanged+=Observe;
+     try{await w.SeekAsync();}finally{seek.PropertyChanged-=Observe;}
+     Check(positions.All(p=>p>=target-.05),"slider jumped back to old playback position");
+     Check(w.Preview.Snapshot.Position>=target-.05&&w.Preview.Snapshot.State==(playing?PreviewState.Playing:PreviewState.Paused),"seek position or resume state wrong");
+     if(playing)await w.Preview.PauseAsync();
+    }
+   });
+   await w.Preview.LoadAsync(Path.Combine(Program.Option("--fixtures")!,"hap-pcm.mov"));
+   w.UpdateSeekTooltip(C<Slider>("Seek").Bounds.Width/2);
+   Check(ToolTip.GetTip(C<Slider>("Seek"))?.ToString()==MediaTimeDisplay.Format(w.Preview.Snapshot.Duration/2,w.Preview.FrameRate),"HAP seek target tooltip wrong");
    using var bitmap=new RenderTargetBitmap(new PixelSize((int)w.ClientSize.Width,(int)w.ClientSize.Height),new Vector(96,96));bitmap.Render(w);bitmap.Save(Path.Combine(folder,"layout.png"));
   }catch(Exception e){failed=true;File.WriteAllText(Path.Combine(folder,"fatal.txt"),e.ToString());}
   finally{busy.SetValue(w,false);w.SetActivity(false,"");await w.StopSyncPreviewAsync();await w.DisposeSharedAudioAsync();await w.Preview.DisposeAsync();await w.Monitor.DisposeAsync();MainWindow.Shutdown(failed?1:0);}

@@ -62,8 +62,7 @@ public partial class MainWindow
  {
   var seek=SeekAccess;
   Control<Slider>("Seek").IsEnabled=seek.Allowed;
-  ToolTip.SetTip(Control<Slider>("Seek"),seek.Allowed?
-   "":seek.Reason);
+  UpdateSeekTooltip(seekHoverX);
   if(!seek.Allowed&&(scrubbing||keyboardSeeking))CancelScrub();
   foreach(string name in new[]{"AddCueButton","LoadProgramButton"}){Control<Button>(name).IsEnabled=CanEditProgram;ToolTip.SetTip(Control<Button>(name),CanEditProgram?null:ProgramEditAccess.Reason);}
   UpdateCueSelectionControls();UpdateCueEditingControls();UpdateTimecodeMenu();
