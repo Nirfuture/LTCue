@@ -110,7 +110,7 @@
    </Button>
    <TextBlock x:Name="DeliveryHint" MaxLines="1" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" Grid.Row="1" Grid.ColumnSpan="3" HorizontalAlignment="Right" MaxWidth="760" TextWrapping="NoWrap" Foreground="{DynamicResource Palette.Warning}" Margin="0,4,0,0" IsVisible="False"/>
   </Grid>
-  <ScrollViewer x:Name="WorkspaceScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
+  <local:WorkspaceScrollViewer x:Name="WorkspaceScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
   <Grid x:Name="Workspace" VerticalAlignment="Top" ColumnDefinitions="*,18,420">
    <Border x:Name="EditorPane" VerticalAlignment="Top" Background="{DynamicResource Palette.PanelBackground}" Padding="14" CornerRadius="8">
     <Grid RowDefinitions="Auto,*,Auto">
@@ -218,7 +218,7 @@
     </Border>
    </Grid>
   </Grid>
-  </ScrollViewer>
+  </local:WorkspaceScrollViewer>
   <TextBlock x:Name="Status" Grid.Row="2" MaxHeight="64" ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" Text="準備中" TextWrapping="Wrap" Margin="0,16,0,0" Foreground="{DynamicResource Palette.StatusText}"/>
  </Grid>
 </Window>
