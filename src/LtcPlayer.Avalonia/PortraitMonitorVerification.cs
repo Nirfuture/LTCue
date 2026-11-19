@@ -21,7 +21,7 @@ public static class PortraitMonitorVerification
      Check(frame.Bounds.Width<=viewport.Bounds.Width&&frame.Bounds.Height<=viewport.Bounds.Height,"output frame overflow");
      Check(window.FindControl<TextBlock>("OutputGeometry")!.Text!.Contains(MainWindow.GeometryLabel(display.Width,display.Height)),"output size label");
      Check(window.FindControl<TextBlock>("VideoGeometry")!.Text!.Contains("1920×1080"),"video size label");
-     string stats=window.FindControl<TextBlock>("RunInfo")!.Text!;Check(stats=="LTC同期"&&ToolTip.GetTip(window.FindControl<TextBlock>("RunInfo")!)?.ToString()?.Contains("スキップフレーム数")==true,"stats wording");
+     string stats=window.FindControl<TextBlock>("RunInfo")!.Text!;Check(stats=="LTC同期"&&ToolTip.GetTip(window.FindControl<TextBlock>("RunInfo")!)==null,"stats wording or obsolete skip tooltip");
      Check(Equals(window.FindControl<Button>("ArmButton")!.Content,"出力停止"),"output button wording");
      if(Program.Arguments.Contains("--visual-monitor"))await Task.Delay(15000);
      results.Add(new{test=display.Name,status="PASS",detail=new{display.Width,display.Height,FrameWidth=frame.Bounds.Width,FrameHeight=frame.Bounds.Height,Output=window.FindControl<TextBlock>("OutputGeometry")!.Text,Video=window.FindControl<TextBlock>("VideoGeometry")!.Text}});

@@ -12,7 +12,12 @@ public static class TimingStatusVerification
   async Task Test(string name,Func<Task> body){try{await body();results.Add(new{test=name,status="PASS"});}catch(Exception e){failed=true;results.Add(new{test=name,status="FAIL",detail=e.ToString()});}File.WriteAllText(Path.Combine(folder,"results.json"),JsonSerializer.Serialize(results,new JsonSerializerOptions{WriteIndented=true}));}
   Task Sync(Action body){body();return Task.CompletedTask;}
   string Text(string name)=>w.FindControl<TextBlock>(name)!.Text??"";
-  async Task Until(Func<bool> predicate){double end=MasterClock.Timestamp()+6;while(!predicate()){if(MasterClock.Timestamp()>end)throw new TimeoutException(Text("VideoTimingStatus")+" / "+Text("AudioTimingStatus"));await Task.Delay(20);}}
+  var waits=new List<object>();
+  async Task Until(Func<bool> predicate,double timeoutSeconds=6,[System.Runtime.CompilerServices.CallerLineNumber]int line=0){
+   double start=MasterClock.Timestamp();
+   try{while(!predicate()){if(MasterClock.Timestamp()-start>timeoutSeconds)throw new TimeoutException(Text("VideoTimingStatus")+" / "+Text("AudioTimingStatus")+" / "+JsonSerializer.Serialize(new{Clock=w.Monitor.Clock.Read(),Observation=w.PreviewObservation,Cues=w.Editor.Rows.Select(r=>new{r.StartTimecode,r.Duration})}));await Task.Delay(20);}}
+   finally{waits.Add(new{Line=line,TimeoutSeconds=timeoutSeconds,ElapsedSeconds=MasterClock.Timestamp()-start,Video=Text("VideoTimingStatus"),Audio=Text("AudioTimingStatus"),Clock=w.Monitor.Clock.Read(),Observation=w.PreviewObservation});}
+  }
   void Capture(string name="timing-status-main.png"){using var b=new global::Avalonia.Media.Imaging.RenderTargetBitmap(new global::Avalonia.PixelSize((int)w.ClientSize.Width,(int)w.ClientSize.Height),new global::Avalonia.Vector(96,96));b.Render(w);b.Save(Path.Combine(folder,name));}
   try{
    await Test("within tolerance and transient jitter do not warn",()=>Sync(()=>{var s=new PlaybackTimingStatus();Check(s.Read("a",.04,.05,0).Text=="遅延なし","normal");Check(s.Read("a",.12,.05,1).Text=="確認中","transient called normal");Check(!s.Read("a",.12,.05,1.2).Warning,"transient warned");Check(!s.Read("a",0,.05,1.25).Warning,"recovered transient");}));
@@ -52,7 +57,7 @@ public static class TimingStatusVerification
     w.SetFrameRateDisplay(60,false);Check(number.Text=="60.0"&&ReferenceEquals(number.Foreground,ThemePalette.SecondaryText),"normal color not restored");
     w.FindControl<StackPanel>("VideoFrameRateGroup")!.IsVisible=false;
    }));
-   var row=new CueRow{FilePath=Path.Combine(Program.Option("--fixtures")!,"h264-aac.mp4")};await ShowProgramService.RefreshAsync(row,CancellationToken.None);w.Editor.Add(row);await w.Preview.LoadAsync(row.FilePath);
+   var row=new CueRow{FilePath=Path.Combine(Program.Option("--fixtures")!,"h264-aac-sync-30s.mp4")};await ShowProgramService.RefreshAsync(row,CancellationToken.None);w.Editor.Add(row);await w.Preview.LoadAsync(row.FilePath);
    await Test("main display shows live manual video and audio status",async()=>{await w.ChangeAudioAsync(true);await w.Preview.PlayAsync();await Until(()=>Text("VideoTimingStatus")=="映像：再生中"&&Text("AudioTimingStatus")=="音声：再生中");Check(w.FindControl<TextBlock>("VideoTimingStatus")!.IsEffectivelyVisible&&w.FindControl<TextBlock>("AudioTimingStatus")!.IsEffectivelyVisible,"hidden");Capture();});
    await Test("pause and off replace healthy timing labels",async()=>{await w.Preview.PauseAsync();await Until(()=>Text("VideoTimingStatus")=="映像：一時停止"&&Text("AudioTimingStatus")=="音声：一時停止");await w.ChangeAudioAsync(false);await Until(()=>Text("AudioTimingStatus")=="音声：OFF");});
    await Test("manual stop aligns video and audio with output off and on while audio OFF stays explicit",async()=>{
@@ -70,9 +75,12 @@ public static class TimingStatusVerification
     }
    });
    await Test("LTC reception interpolation loss and input fault remain distinct",async()=>{
+    // Recovery includes a loss interval and decoder/audio preparation. Keep the
+    // cue active throughout rather than testing the end of the six-second clip.
+    Check(row.Duration>=29.9,"synchronization fixture is too short");
     await w.ApplySettingsAsync(new(new(Rate:"29.97 DF",Offset:3),VideoRenderer.Displays().First(d=>d.Primary!=0)));
     int receiving=1,frames=15;await w.ChangeAudioAsync(true);await w.Monitor.ConfigureAsync(new(Rate:"29.97 DF",Freewheel:1),async(clock,token)=>{while(!token.IsCancellationRequested){if(Volatile.Read(ref receiving)!=0){int f=Interlocked.Increment(ref frames);clock.Accept(new TcFrame{Seconds=f/30,Frame=f%30,Drop=1},MasterClock.Timestamp());}await Task.Delay(33,token);}});
-    await Until(()=>Text("VideoTimingStatus").StartsWith("映像：遅延なし")&&Text("AudioTimingStatus")=="音声：遅延なし");
+    await Until(()=>Text("VideoTimingStatus").StartsWith("映像：遅延なし")&&Text("AudioTimingStatus")=="音声：遅延なし",15);
     await Until(()=>Text("VideoTimingStatus")=="映像：遅延なし"&&w.FindControl<StackPanel>("VideoFrameRateGroup")!.IsVisible&&System.Text.RegularExpressions.Regex.IsMatch(Text("VideoFrameRateNumber"),@"^[0-9]+\.[0-9]$"));
     Check(ToolTip.GetTip(w.FindControl<TextBlock>("RunInfo")!)==null,"cumulative skip tooltip remains");Capture("timing-status-sync-fps.png");
     var seek=w.FindControl<Slider>("Seek")!;
@@ -84,11 +92,12 @@ public static class TimingStatusVerification
     await Until(()=>Text("VideoTimingStatus")=="映像：入力待ち"&&Text("AudioTimingStatus")=="音声：入力待ち");
     Check(!w.FindControl<StackPanel>("VideoFrameRateGroup")!.IsVisible,"input loss retained fps");
     double held=seek.Value;await Task.Delay(150);Check(!seek.IsEnabled&&Math.Abs(seek.Value-held)<.001,"held sync seek moved or became editable");
-    Volatile.Write(ref receiving,1);await Until(()=>Text("VideoTimingStatus").StartsWith("映像：遅延なし")&&Text("AudioTimingStatus")=="音声：遅延なし");
+    Volatile.Write(ref receiving,1);await Until(()=>Text("VideoTimingStatus").StartsWith("映像：遅延なし")&&Text("AudioTimingStatus")=="音声：遅延なし",15);
     await Until(()=>seek.Value>held+.1);Check(!seek.IsEnabled,"resumed synchronization permits seeking");
+    Check(w.Monitor.Clock.Read().Seconds+TimecodeRate.Modes.First(r=>r.Name=="29.97 DF").FramesToSeconds(3)<row.Duration,"recovery ran beyond the cue");
     Volatile.Write(ref receiving,0);w.Monitor.Clock.Fault();await Until(()=>Text("VideoTimingStatus")=="映像：入力エラー"&&Text("AudioTimingStatus")=="音声：入力エラー");
    });
   }catch(Exception e){failed=true;File.WriteAllText(Path.Combine(folder,"fatal.txt"),e.ToString());}
-  finally{await w.DisarmAsync();await w.DisposeSharedAudioAsync();await w.Preview.DisposeAsync();await w.Monitor.DisposeAsync();MainWindow.Shutdown(failed?1:0);}
+  finally{File.WriteAllText(Path.Combine(folder,"waits.json"),JsonSerializer.Serialize(waits,new JsonSerializerOptions{WriteIndented=true}));await w.DisarmAsync();await w.DisposeSharedAudioAsync();await w.Preview.DisposeAsync();await w.Monitor.DisposeAsync();MainWindow.Shutdown(failed?1:0);}
  }
 }

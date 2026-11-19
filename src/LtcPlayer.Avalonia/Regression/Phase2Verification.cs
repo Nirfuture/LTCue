@@ -19,7 +19,7 @@ public static class Phase2Verification
             await Test("input settings persistence",()=>
             {
                 var setting=new InputSettings("synthetic-endpoint","Fixture",1,"29.97 DF","01:00:00:00",-2,0.3,3);
-                var path=Path.Combine(folder,"settings-fixture.json");setting.Save(path);Assert(InputSettings.Load(path)==setting,"roundtrip");
+                var path=Path.Combine(folder,"settings-fixture.json");setting.Save(path);Assert(LtcPlayer.Avalonia.SettingsVerification.Equivalent(setting,InputSettings.Load(path)),"roundtrip");
                 return Task.FromResult<object>("device ID, channel, mode, start, offset, freewheel and threshold persist");
             });
             await Test("stereo L/R isolation through WASAPI conversion routine",()=>

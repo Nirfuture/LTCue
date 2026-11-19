@@ -42,7 +42,7 @@ try{
  $dotnet=(Get-Command $DotnetPath -CommandType Application).Source
  if([bool]$FixturesPath -ne [bool]$AudioFixturesPath){throw 'Specify both fixture paths, or omit both to generate them.'}
  if(-not $FixturesPath){$FixturesPath=Join-Path $ResultPath 'fixtures';& (Join-Path $PSScriptRoot 'new-test-fixtures.ps1') -Path $FixturesPath;$AudioFixturesPath=$FixturesPath}
- $required=@(@($FixturesPath,'h264-aac.mp4'),@($FixturesPath,'hap-pcm.mov'),@($FixturesPath,'hap-q-silent.mov'),@($FixturesPath,'h264-mp3.mp4'),@($FixturesPath,'hap-sync-30s.mov'),@($AudioFixturesPath,'late-pcm.mov'),@($AudioFixturesPath,'early-pcm.mov'),@($AudioFixturesPath,'nonzero-aac.mp4'))
+ $required=@(@($FixturesPath,'h264-aac.mp4'),@($FixturesPath,'h264-aac-sync-30s.mp4'),@($FixturesPath,'hap-pcm.mov'),@($FixturesPath,'hap-q-silent.mov'),@($FixturesPath,'h264-mp3.mp4'),@($FixturesPath,'hap-sync-30s.mov'),@($AudioFixturesPath,'late-pcm.mov'),@($AudioFixturesPath,'early-pcm.mov'),@($AudioFixturesPath,'nonzero-aac.mp4'))
  $hashes=@(foreach($pair in $required){$file=Join-Path $pair[0] $pair[1];if(-not(Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -eq 0){throw "Missing/empty fixture: $file"};Get-FileHash -LiteralPath $file -Algorithm SHA256})
  $manifest=[ordered]@{CreatedUtc=[DateTime]::UtcNow.ToString('o');BuildSkipped=[bool]$SkipBuild;Executable=$ExecutablePath;CatalogVersion=$catalog.Version;Files=@(Get-FileHash -LiteralPath $assembly,(Join-Path $app 'PlayerNative.dll'),(Join-Path $app 'AudioNative.dll'),$SyncRecoveryAssemblyPath,$HapPreparationAssemblyPath,$JumpRecoveryAssemblyPath,$TimecodeEditingAssemblyPath -Algorithm SHA256);Fixtures=$hashes;Excluded=@($catalog.Suites | Where-Object Mode -ne Auto);PhysicalValidation='Not performed by this automatic runner.'}
  $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $ResultPath 'manifest.json') -Encoding utf8
@@ -68,7 +68,7 @@ try{
  $watch=[Diagnostics.Stopwatch]::StartNew()
  $exit=Invoke-VerificationProcess $dotnet @($TimecodeEditingAssemblyPath,(Join-Path $folder 'results.json')) $folder 90
  $items=@(Get-Content -LiteralPath (Join-Path $folder 'results.json') -Raw | ConvertFrom-Json)
- $ok=$exit -eq 0 -and $items.Count -eq 31 -and @($items | Where-Object status -ne 'PASS').Count -eq 0
+ $ok=$exit -eq 0 -and $items.Count -eq 32 -and @($items | Where-Object status -ne 'PASS').Count -eq 0
  $summary.Add([ordered]@{Suite='timecode-editing-calculation';Status=$(if($ok){'PASS'}else{'FAIL'});Count=$items.Count;ExitCode=$exit;Seconds=$watch.Elapsed.TotalSeconds})
  foreach($suite in $catalog.Suites | Where-Object Mode -eq Auto){
   if($suite.Name -notmatch '^[a-z0-9-]+$'){throw 'Invalid suite name.'}

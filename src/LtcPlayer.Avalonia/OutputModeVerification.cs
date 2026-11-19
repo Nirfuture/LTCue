@@ -16,7 +16,16 @@ public static class OutputModeVerification
     string file=Path.Combine(folder,"legacy.json");File.WriteAllText(file,"{\"Rate\":\"29.97 DF\"}");Check(InputSettings.Load(file).OutputMode==OutputPresentationMode.Standard,"legacy default");return Task.FromResult<object>("Standard");
    });
    await Test("Both output modes survive save and load",()=>{
-    foreach(var mode in Enum.GetValues<OutputPresentationMode>()){string file=Path.Combine(folder,mode+".json");var settings=new InputSettings(OutputMode:mode);settings.Save(file);Check(InputSettings.Load(file)==settings,"mode roundtrip");Check(File.ReadAllText(file).Contains(mode.ToString()),"readable mode in JSON");}return Task.FromResult<object>("Standard / Compatibility");
+    foreach(var mode in Enum.GetValues<OutputPresentationMode>()){
+     string file=Path.Combine(folder,mode+".json");
+     var settings=new InputSettings(OutputMode:mode){CueFormat=new(){Presets=[new(720,1280,"縦HD"),new(1080,1920,"縦FHD")]}};
+     settings.Save(file);var loaded=InputSettings.Load(file);
+     Check(SettingsVerification.Equivalent(settings,loaded),"mode roundtrip");
+     Check(!SettingsVerification.Equivalent(settings,loaded with{OutputMode=mode==OutputPresentationMode.Standard?OutputPresentationMode.Compatibility:OutputPresentationMode.Standard}),"mode difference ignored");
+     Check(!SettingsVerification.Equivalent(settings,loaded with{CueFormat=loaded.CueFormat with{Presets=loaded.CueFormat.Presets.Reverse().ToArray()}}),"preset order difference ignored");
+     Check(!SettingsVerification.Equivalent(settings,loaded with{CueFormat=loaded.CueFormat with{Presets=[loaded.CueFormat.Presets[0] with{Name="変更"},loaded.CueFormat.Presets[1]]}}),"preset value difference ignored");
+     Check(File.ReadAllText(file).Contains(mode.ToString()),"readable mode in JSON");
+    }return Task.FromResult<object>("Standard / Compatibility");
    });
    await Test("Invalid mode is rejected",()=>{
     string file=Path.Combine(folder,"invalid.json");File.WriteAllText(file,"{\"OutputMode\":55}");bool rejected=false;try{InputSettings.Load(file);}catch(InvalidDataException){rejected=true;}Check(rejected,"invalid mode accepted");return Task.FromResult<object>("Rejected");
@@ -35,7 +44,8 @@ public static class OutputModeVerification
      var display=VideoRenderer.Displays()[0];await window.ApplySettingsAsync(new(new(Rate:"29.97 DF",OutputMode:mode),display));
      OutputPresentationMode? actual=null;
      try{
-      await window.ArmAsync(async(clock,token)=>{while(!token.IsCancellationRequested){clock.Accept(new TcFrame{Seconds=2,Drop=1},MasterClock.Timestamp());await Task.Delay(33,token);}});
+      int frames=60;
+      await window.ArmAsync(async(clock,token)=>{while(!token.IsCancellationRequested){int f=Interlocked.Increment(ref frames);clock.Accept(new TcFrame{Seconds=f/30,Frame=f%30,Drop=1},MasterClock.Timestamp());await Task.Delay(33,token);}});
       for(int i=0;i<700&&window.LatestObservation is not {Presented:>2};i++)await Task.Delay(15);
       Check(window.LatestObservation is {Presented:>2},"no frames");actual=window.Surface.Canvas.OutputMode;Check(actual==mode&&window.LatestObservation!.OutputMode==mode,"wrong actual output mode");
       await Task.Delay(150);Check(window.FindControl<TextBlock>("OutputModeLabel")!.Text!.Contains(OutputPresentation.Label(mode)),"main output-mode label");

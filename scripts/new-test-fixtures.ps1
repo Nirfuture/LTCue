@@ -5,6 +5,7 @@ if(Test-Path -LiteralPath $Path){throw 'Fixture directory must be new.'}
 New-Item -ItemType Directory -Path $Path | Out-Null
 function Encode([string[]]$Arguments){ & ffmpeg -hide_banner -nostdin -loglevel error @Arguments; if($LASTEXITCODE -ne 0){throw 'Fixture generation failed.'} }
 Encode @('-f','lavfi','-i','testsrc2=size=1920x1080:rate=25','-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','6','-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p','-c:a','aac',"$Path/h264-aac.mp4")
+Encode @('-stream_loop','4','-i',"$Path/h264-aac.mp4",'-t','30','-c','copy',"$Path/h264-aac-sync-30s.mp4")
 Encode @('-f','lavfi','-i','testsrc2=size=640x360:rate=25','-f','lavfi','-i','sine=frequency=660:sample_rate=48000','-t','4','-c:v','hap','-format','hap','-c:a','pcm_s16le',"$Path/hap-pcm.mov")
 Encode @('-f','lavfi','-i','testsrc2=size=640x360:rate=25','-t','1','-c:v','hap','-format','hap_q',"$Path/hap-q-silent.mov")
 Encode @('-i',"$Path/h264-aac.mp4",'-c:v','copy','-c:a','libmp3lame',"$Path/h264-mp3.mp4")

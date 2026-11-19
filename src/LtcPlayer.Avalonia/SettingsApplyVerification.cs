@@ -93,7 +93,7 @@ public static class SettingsApplyVerification
    await Test("retry commits prepared resources and UI without duplicate fade saves",async()=>{
     var current=InputSettings.Load(settingsFile);var next=current with{Channel=1,CoverPath=Path.Combine(folder,"cover-blue.png"),FadeSeconds=2};var canvas=w.Surface.Canvas.SessionId;
     await w.ApplySettingsAsync(new(next,fake));Check(w.Surface.Canvas.SessionId!=canvas&&w.Surface.CanvasSize==(640,360),"new canvas not committed");
-    Check(InputSettings.Load(settingsFile)==next,"successful retry persisted values mismatch");Check(SavedDisplay()==fake.Name,"successful retry display mismatch");Check(w.Cover.Image?.Path==Path.GetFullPath(next.CoverPath),"successful retry cover mismatch");Check(w.FindControl<NumericUpDown>("FadeSeconds")!.Value==2,"successful retry fade mismatch");
+    Check(SettingsVerification.Equivalent(next,InputSettings.Load(settingsFile)),"successful retry persisted values mismatch");Check(SavedDisplay()==fake.Name,"successful retry display mismatch");Check(w.Cover.Image?.Path==Path.GetFullPath(next.CoverPath),"successful retry cover mismatch");Check(w.FindControl<NumericUpDown>("FadeSeconds")!.Value==2,"successful retry fade mismatch");
     w.SettingsDisplaysForTest=null;await w.ApplySettingsAsync(new(new(),display));
    });
   }catch(Exception e){failed=true;File.WriteAllText(Path.Combine(folder,"fatal.txt"),e.ToString());}

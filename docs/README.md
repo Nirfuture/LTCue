@@ -16,6 +16,8 @@
 
 ## 現在の調査記録
 
+- [環境A：検証完了・開始遅延調査の引き継ぎ（2026-11-19）](HANDOFF_ENV_A_2026-11-19.md)
+- [環境A：一括検証と検証側修正の記録（2026-11-19）](ENV_A_VERIFICATION_2026-11-19.md)
 - [検証環境Aの開始計測](STARTUP_CHECK_ENV_A.md)
 - [検証環境Bとの比較](STARTUP_CHECK_ENV_B.md)
 - [検証環境Aのプロセス起動診断](STARTUP_PROCESS_LAUNCH_ENV_A.md)
