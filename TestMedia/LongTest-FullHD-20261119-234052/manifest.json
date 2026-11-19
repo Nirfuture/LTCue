@@ -1,0 +1,26 @@
+[
+  {
+    "Path": "C:\\Users\\izumi\\Desktop\\LTCue\\LTCue\\TestMedia\\LongTest-FullHD-20261119-234052\\test-4min-fullhd-h264-aac.mp4",
+    "Bytes": 200344233,
+    "SHA256": "6B70977D9AC625929FE96BE89C874AE3340C4AA57241C7F5EF9CE64C1B1D7E6E",
+    "Duration": "240.000000",
+    "VideoCodec": "h264",
+    "VideoTag": "avc1",
+    "Frames": "7200",
+    "AudioCodec": "aac",
+    "AudioRate": "48000",
+    "Channels": 2
+  },
+  {
+    "Path": "C:\\Users\\izumi\\Desktop\\LTCue\\LTCue\\TestMedia\\LongTest-FullHD-20261119-234052\\test-4min-fullhd-hap-pcm24.mov",
+    "Bytes": 795115774,
+    "SHA256": "415C7232014D75854A828E3E9D31909733DDB80F3D1D0EEA299269AA87A14EBE",
+    "Duration": "240.000000",
+    "VideoCodec": "hap",
+    "VideoTag": "Hap1",
+    "Frames": "7200",
+    "AudioCodec": "pcm_s24le",
+    "AudioRate": "48000",
+    "Channels": 2
+  }
+]

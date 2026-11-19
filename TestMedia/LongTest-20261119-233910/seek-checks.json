@@ -1,0 +1,32 @@
+[
+  {
+    "File": "C:\\Users\\izumi\\Desktop\\LTCue\\LTCue\\TestMedia\\LongTest-20261119-233910\\test-4min-h264-aac.mp4",
+    "Seek": "0",
+    "VideoAndAudioDecode": "PASS"
+  },
+  {
+    "File": "C:\\Users\\izumi\\Desktop\\LTCue\\LTCue\\TestMedia\\LongTest-20261119-233910\\test-4min-h264-aac.mp4",
+    "Seek": "120",
+    "VideoAndAudioDecode": "PASS"
+  },
+  {
+    "File": "C:\\Users\\izumi\\Desktop\\LTCue\\LTCue\\TestMedia\\LongTest-20261119-233910\\test-4min-h264-aac.mp4",
+    "Seek": "239.8",
+    "VideoAndAudioDecode": "PASS"
+  },
+  {
+    "File": "C:\\Users\\izumi\\Desktop\\LTCue\\LTCue\\TestMedia\\LongTest-20261119-233910\\test-4min-hap-pcm24.mov",
+    "Seek": "0",
+    "VideoAndAudioDecode": "PASS"
+  },
+  {
+    "File": "C:\\Users\\izumi\\Desktop\\LTCue\\LTCue\\TestMedia\\LongTest-20261119-233910\\test-4min-hap-pcm24.mov",
+    "Seek": "120",
+    "VideoAndAudioDecode": "PASS"
+  },
+  {
+    "File": "C:\\Users\\izumi\\Desktop\\LTCue\\LTCue\\TestMedia\\LongTest-20261119-233910\\test-4min-hap-pcm24.mov",
+    "Seek": "239.8",
+    "VideoAndAudioDecode": "PASS"
+  }
+]
