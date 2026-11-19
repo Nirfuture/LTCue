@@ -10,9 +10,9 @@ internal static class StartupMeasurementTrace
  static string trial="";static bool enabled;
  internal static void Begin(string id){lock(gate){enabled=true;trial=id;}}
  [Conditional("VERIFICATION")]
- internal static void Mark(string name,double? value=null,string? note=null){lock(gate){if(enabled&&entries.Count<512)entries.Add(new(trial,name,MasterClock.Timestamp(),value,note));}}
+ internal static void Mark(string name,double? value=null,string? note=null){lock(gate){if(enabled&&entries.Count<2048)entries.Add(new(trial,name,MasterClock.Timestamp(),value,note));}}
  [Conditional("VERIFICATION")]
- internal static void Once(string name,double? value=null,string? note=null){lock(gate){if(enabled&&entries.Count<512&&once.Add(trial+"/"+name))entries.Add(new(trial,name,MasterClock.Timestamp(),value,note));}}
+ internal static void Once(string name,double? value=null,string? note=null){lock(gate){if(enabled&&entries.Count<2048&&once.Add(trial+"/"+name))entries.Add(new(trial,name,MasterClock.Timestamp(),value,note));}}
  internal static Entry[] Snapshot(){lock(gate)return entries.ToArray();}
  internal static void End(){lock(gate)enabled=false;}
 }

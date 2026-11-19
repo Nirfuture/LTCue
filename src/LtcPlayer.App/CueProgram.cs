@@ -115,9 +115,10 @@ public static class ShowProgramService
         foreach(var item in result.Rows){item.Row.Error=item.Error;item.Row.Warning=item.Warning;item.Row.OverlapDetails=item.OverlapDetails;}
         return result.Timeline.Where(c=>c.CanStart).ToList();
     }
-    public static async Task RefreshAsync(CueRow row,CancellationToken token)
+    public static async Task RefreshAsync(CueRow row,CancellationToken token,MediaAnalysisService? analysis=null,bool forceRefresh=false)
     {
-        var info=await new MediaDecoder().InspectAsync(row.FilePath,token);
+        if(forceRefresh)analysis?.Invalidate(row.FilePath);
+        var info=await new MediaDecoder(analysis:analysis).InspectAsync(row.FilePath,token);
         row.AcceptMedia(info);
     }
     public static ShowProgramDocument Capture(IList<CueRow> rows,TimecodeRate rate)
@@ -140,12 +141,13 @@ public static class ShowProgramService
             try{File.Delete(temporary);}catch(IOException){}catch(UnauthorizedAccessException){}
         }
     }
-    public static async Task<(TimecodeRate Rate,List<CueRow> Rows,List<string> Notices)> LoadAsync(string path,CancellationToken token)
+    public static async Task<(TimecodeRate Rate,List<CueRow> Rows,List<string> Notices)> LoadAsync(string path,CancellationToken token,MediaAnalysisService? analysis=null)
     {
         if(new FileInfo(path).Length>4*1024*1024)throw new InvalidDataException("キューリストが大きすぎます（上限4MiB）");
         var doc=JsonSerializer.Deserialize<ShowProgramDocument>(await File.ReadAllTextAsync(path,token))??throw new InvalidDataException("キューリストを読み込めません");
         if(doc.Version!=1 || doc.Cues==null || doc.Cues.Count>1000)throw new InvalidDataException("キューリストの形式不正");
         var rate=TimecodeRate.Modes.FirstOrDefault(r=>r.Name==doc.TimecodeRate)??throw new InvalidDataException("非対応LTC形式");
+        var refreshed=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var rows=new List<CueRow>();var notices=new List<string>();var ids=new HashSet<Guid>();
         foreach(var c in doc.Cues.OrderBy(c=>c.DisplayOrder))
         {
@@ -155,7 +157,8 @@ public static class ShowProgramService
             try{row.SetStart(c.StartTimecode??"");}catch(InvalidDataException){row.Hours=c.StartTimecode??"形式不正";}
             try{
                 row.FilePath=Path.IsPathFullyQualified(row.FilePath)?row.FilePath:Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path)!,row.FilePath));
-                await RefreshAsync(row,token);
+                if(refreshed.Add(Path.GetFullPath(row.FilePath)))analysis?.Invalidate(row.FilePath);
+                await RefreshAsync(row,token,analysis);
             }
             catch(OperationCanceledException)when(token.IsCancellationRequested){throw;}
             catch(Exception e)when(e is IOException or InvalidDataException or ArgumentException or System.ComponentModel.Win32Exception or OperationCanceledException){row.SourceError=e.Message;notices.Add(row.Name+": "+e.Message);}

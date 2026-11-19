@@ -1,6 +1,8 @@
 {
   "Version": 1,
   "Suites": [
+    {"Name":"direct-pcm","Count":26,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":150,"Mode":"Auto"},
+    {"Name":"media-analysis","Count":22,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"},
     {"Name":"cue-format","Count":6,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"},
     {"Name":"cover-pacing","Count":12,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"},
     {"Name":"display-columns","Count":8,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"},
@@ -355,6 +357,7 @@
       "TimeoutSeconds": 120,
       "Mode": "Auto"
     },
-    {"Name":"timecode-editing","Count":10,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"}
+    {"Name":"timecode-editing","Count":10,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"},
+    {"Name":"mp4-single-start","Count":12,"Evidence":"results.json","Kind":"Status","TimeoutSeconds":120,"Mode":"Auto"}
   ]
 }

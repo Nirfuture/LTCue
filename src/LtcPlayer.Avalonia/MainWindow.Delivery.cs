@@ -37,12 +37,23 @@ public partial class MainWindow
   StartupMeasurementTrace.Mark("play_request");
   if(!ManualPlayAccess.Allowed)return;
   await StopSyncPreviewAsync();if(!ManualPlayAccess.Allowed)return;
-  bool same=previewCue==row.CueId&&string.Equals(Preview.LoadedPath,row.FilePath,StringComparison.OrdinalIgnoreCase);
+  bool same=Preview.LoadedVersionMatches&&previewCue==row.CueId&&string.Equals(Preview.LoadedPath,row.FilePath,StringComparison.OrdinalIgnoreCase);
   if(!playback.UsesSharedAudio)Preview.AllowAudioForNextPlay();
   if(restart||!same){
    CancelScrub();
-   try{if(!await Preview.LoadAsync(row.FilePath))return;previewCue=row.CueId;row.ClearSourceError();Editor.Validate();}
-   catch(Exception e)when(e is IOException or InvalidDataException){Preview.IndexCache.Invalidate(row.FilePath);row.SourceError=e.Message;Editor.Validate();throw;}
+   string requestedPath=row.FilePath;
+   bool Adopt(){
+    if(!ManualControlAccess.Allowed||LtcHasPriority||Preview.IsSyncOwned||!Editor.Rows.Contains(row)||row.FilePath!=requestedPath)return false;
+    previewCue=row.CueId;row.ClearSourceError();Editor.Validate();
+    return ManualControlAccess.Allowed&&!LtcHasPriority&&!Preview.IsSyncOwned&&Editor.Rows.Contains(row)&&row.FilePath==requestedPath;
+   }
+   try{
+    if(Path.GetExtension(requestedPath).Equals(".mp4",StringComparison.OrdinalIgnoreCase)){
+     await Preview.LoadAndPlayAsync(requestedPath,Adopt);UpdateRowControls();return;
+    }
+    if(!await Preview.LoadAsync(requestedPath))return;previewCue=row.CueId;row.ClearSourceError();Editor.Validate();
+   }
+   catch(Exception e)when(e is IOException or InvalidDataException){Preview.Analysis.Invalidate(row.FilePath);row.SourceError=e.Message;Editor.Validate();throw;}
   }
   if(LtcHasPriority||Preview.IsSyncOwned){await UpdateAutoPreviewAsync();return;}
   if(!restart&&same&&Preview.Snapshot.State==PreviewState.Playing)await Preview.PauseAsync();else await Preview.PlayAsync();

@@ -48,7 +48,7 @@ public sealed class ProgramPlayback
         }
         public ValueTask DisposeAsync()=>buffer.DisposeAsync();
     }
-    public async Task RunAsync(IReadOnlyList<ScheduledCue> cues,OutputDisplay display,MasterClock clock,double offset,Action<ProgramObservation> observe,CancellationToken token,bool verify=false,nint monitorWindow=0,Action? stopRequested=null,Action<int>? monitorError=null,OutputPresentationMode outputMode=OutputPresentationMode.Standard,ManualOutputControl? manualControl=null,IProgramPresentation? presentation=null,CoverController? cover=null,Dictionary<string,MediaDecoder>? analysisCache=null,CueScheduler? timeline=null,PlaybackTimeline? sourceTimeline=null,HapIndexCache? indexCache=null)
+    public async Task RunAsync(IReadOnlyList<ScheduledCue> cues,OutputDisplay display,MasterClock clock,double offset,Action<ProgramObservation> observe,CancellationToken token,bool verify=false,nint monitorWindow=0,Action? stopRequested=null,Action<int>? monitorError=null,OutputPresentationMode outputMode=OutputPresentationMode.Standard,ManualOutputControl? manualControl=null,IProgramPresentation? presentation=null,CoverController? cover=null,Dictionary<string,MediaDecoder>? analysisCache=null,CueScheduler? timeline=null,PlaybackTimeline? sourceTimeline=null,HapIndexCache? indexCache=null,MediaAnalysisService? mediaAnalysis=null)
     {
         OutputPresentation.Validate(outputMode);
         var source=sourceTimeline??new PlaybackTimeline();if(sourceTimeline==null)source.Update(cues);VideoRenderer? renderer=null;CueFrames? active=null,preload=null,recovery=null;bool monitorFaultNotified=false;
@@ -67,9 +67,9 @@ public sealed class ProgramPlayback
                 var pinned=new[]{active?.Cue.FilePath,preload?.Cue.FilePath,recovery?.Cue.FilePath}.Where(p=>p!=null).Select(p=>Path.GetFullPath(p!)).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var unused=analyses.Keys.FirstOrDefault(p=>!pinned.Contains(p));
                 if(unused!=null)analyses.Remove(unused);
-                else return new MediaDecoder(reuseAnalysis:true,gpuScaling:true,indexCache:indexCache);
+                else return new MediaDecoder(reuseAnalysis:true,gpuScaling:true,indexCache:indexCache,analysis:mediaAnalysis);
             }
-            decoder=new MediaDecoder(reuseAnalysis:true,gpuScaling:true,indexCache:indexCache);analyses.Add(key,decoder);return decoder;
+            decoder=new MediaDecoder(reuseAnalysis:true,gpuScaling:true,indexCache:indexCache,analysis:mediaAnalysis);analyses.Add(key,decoder);return decoder;
         }
         try
         {

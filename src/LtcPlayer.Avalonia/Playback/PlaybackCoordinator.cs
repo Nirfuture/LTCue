@@ -78,7 +78,7 @@ public sealed class PlaybackCoordinator : IAsyncDisposable
   await audioCommands.WaitAsync();
   try{
    ObjectDisposedException.ThrowIf(disposed,this);
-   if(audio==null){await manual.UseSharedAudioAsync();ObjectDisposedException.ThrowIf(disposed,this);audio=new(ReadAudioPlayhead,silenceForVerification);audio.SourceFailed+=(source,error)=>AudioMaterialFailed?.Invoke(source,error);PublishManual(manual.Snapshot);}
+   if(audio==null){await manual.UseSharedAudioAsync();ObjectDisposedException.ThrowIf(disposed,this);audio=new(ReadAudioPlayhead,silenceForVerification,analysis:manual.Analysis);audio.SourceFailed+=(source,error)=>AudioMaterialFailed?.Invoke(source,error);PublishManual(manual.Snapshot);}
    await audio.ConfigureAsync(enabled,device,volume,muted);
   }finally{audioCommands.Release();}
  }
@@ -101,7 +101,7 @@ public sealed class PlaybackCoordinator : IAsyncDisposable
  async Task RunAsync(SyncRun owner,List<ScheduledCue> cues,OutputDisplay display,double offset)
  {
   var token=owner.Cancel.Token;
-  try{await Task.Run(()=>new ProgramPlayback(new UiDispatcher()).RunAsync(cues,display,clock(),offset,p=>Observe(owner,p),token,presentation:new PreviewProgramPresentation(surface,()=>MayPresent(owner)),cover:cover,analysisCache:analyses,sourceTimeline:owner.Timeline,indexCache:manual.IndexCache));}
+  try{await Task.Run(()=>new ProgramPlayback(new UiDispatcher()).RunAsync(cues,display,clock(),offset,p=>Observe(owner,p),token,presentation:new PreviewProgramPresentation(surface,()=>MayPresent(owner)),cover:cover,analysisCache:analyses,sourceTimeline:owner.Timeline,indexCache:manual.IndexCache,mediaAnalysis:manual.Analysis));}
   catch(OperationCanceledException)when(token.IsCancellationRequested){}
   catch(Exception e){DeferRetry();lock(state){if(ReferenceEquals(run,owner))playhead=AudioPlayhead.Empty;}Failed?.Invoke(e);}
  }

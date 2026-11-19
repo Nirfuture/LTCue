@@ -8,19 +8,20 @@ public sealed record MaterialResult(MaterialRequest Request,MediaInfo? Info,stri
 // matching the original row, path and revision. Never decodes on the rendering thread.
 public sealed class MaterialMonitor : IAsyncDisposable
 {
-    sealed record Stamp(long Length,DateTime Modified);
+    sealed record Stamp(long Length,DateTime Modified,DateTime Created);
     sealed record Observed(Stamp? Stamp,bool Pending);
     readonly Func<Task<MaterialRequest[]>> snapshot;
     readonly Func<MaterialResult[],Task> apply;
     readonly Func<bool> preparing;
     readonly Func<MediaDecoder> createDecoder;
+    readonly Action<string>? invalidate;
     readonly CancellationTokenSource stop=new();
     readonly Task worker;
     readonly SemaphoreSlim wake=new(0,1);
     readonly Dictionary<string,FileSystemWatcher> watchers=new(StringComparer.OrdinalIgnoreCase);
     readonly Dictionary<string,Observed> observations=new(StringComparer.OrdinalIgnoreCase);
-    public MaterialMonitor(Func<Task<MaterialRequest[]>> snapshot,Func<MaterialResult[],Task> apply,Func<bool> preparing,Func<MediaDecoder>? createDecoder=null)
-    {this.snapshot=snapshot;this.apply=apply;this.preparing=preparing;this.createDecoder=createDecoder??(()=>new MediaDecoder());worker=Task.Run(RunAsync);}
+    public MaterialMonitor(Func<Task<MaterialRequest[]>> snapshot,Func<MaterialResult[],Task> apply,Func<bool> preparing,Func<MediaDecoder>? createDecoder=null,Action<string>? invalidate=null)
+    {this.invalidate=invalidate;this.snapshot=snapshot;this.apply=apply;this.preparing=preparing;this.createDecoder=createDecoder??(()=>new MediaDecoder());worker=Task.Run(RunAsync);}
 
     void Signal(){try{wake.Release();}catch(SemaphoreFullException){}catch(ObjectDisposedException){}}
     void UpdateWatchers(IEnumerable<string> paths)
@@ -49,7 +50,7 @@ public sealed class MaterialMonitor : IAsyncDisposable
             foreach(var group in requests.GroupBy(r=>r.Path,StringComparer.OrdinalIgnoreCase)){
                 token.ThrowIfCancellationRequested();
                 string path=group.Key;Stamp? stamp=null;
-                try{var file=new FileInfo(path);if(file.Exists)stamp=new(file.Length,file.LastWriteTimeUtc);}
+                try{var file=new FileInfo(path);if(file.Exists)stamp=new(file.Length,file.LastWriteTimeUtc,file.CreationTimeUtc);}
                 catch(Exception e)when(e is IOException or UnauthorizedAccessException or ArgumentException){}
                 observations.TryGetValue(path,out var prior);
                 if(stamp==null){
@@ -67,12 +68,12 @@ public sealed class MaterialMonitor : IAsyncDisposable
                 using var check=CancellationTokenSource.CreateLinkedTokenSource(token);check.CancelAfter(TimeSpan.FromSeconds(12));
                 MediaInfo? info=null;string error="";
                 try{
-                    var decoder=createDecoder();info=await decoder.InspectAsync(path,check.Token);
+                    invalidate?.Invoke(path);var decoder=createDecoder();info=await decoder.InspectAsync(path,check.Token);
                     bool frame=false;
                     await foreach(var _ in decoder.DecodeAsync(path,64,64,check.Token)){frame=true;break;}
                     if(!frame)throw new InvalidDataException("表示できるフレームなし");
                     var after=new FileInfo(path);
-                    if(!after.Exists||new Stamp(after.Length,after.LastWriteTimeUtc)!=stamp){observations[path]=new(stamp,true);continue;}
+                    if(!after.Exists||new Stamp(after.Length,after.LastWriteTimeUtc,after.CreationTimeUtc)!=stamp){observations[path]=new(stamp,true);continue;}
                 }
                 catch(OperationCanceledException)when(token.IsCancellationRequested){throw;}
                 catch(Exception e)when(e is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or OperationCanceledException){info=null;error=e is OperationCanceledException?"素材の確認がタイムアウト":e.Message;}

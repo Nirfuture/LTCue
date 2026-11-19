@@ -37,7 +37,7 @@ public partial class MainWindow : Window
   AddHandler(PointerPressedEvent,(_,e)=>TracePointer("press",e),RoutingStrategies.Tunnel,true);
   AddHandler(PointerReleasedEvent,(_,e)=>TracePointer("release",e),RoutingStrategies.Tunnel,true);
   activityDelay.Tick+=(_,_)=>UpdateActivity();
-  Preview=new(Surface);playback=new(Preview,Surface,()=>monitor.Clock,cover);Editor.DefinitionAuthority=()=>DefinitionAuthority;Editor.ReorderAuthority=()=>!closing&&!closePending&&delivery is not (DeliveryState.Starting or DeliveryState.Stopping or DeliveryState.ConfirmingStop);playback.Failed+=OnPlaybackFailed;Preview.Changed+=UpdatePreview;InitializeResponsiveLayout();InitializeColumnSizing();InitializePresentation();
+  Preview=new(Surface);Editor.Analysis=Preview.Analysis;playback=new(Preview,Surface,()=>monitor.Clock,cover);Editor.DefinitionAuthority=()=>DefinitionAuthority;Editor.ReorderAuthority=()=>!closing&&!closePending&&delivery is not (DeliveryState.Starting or DeliveryState.Stopping or DeliveryState.ConfirmingStop);playback.Failed+=OnPlaybackFailed;Preview.Changed+=UpdatePreview;InitializeResponsiveLayout();InitializeColumnSizing();InitializePresentation();
   Control<Grid>("PreviewViewport").SizeChanged+=(_,_)=>UpdatePreviewGeometry();
   Editor.Changed+=()=>{UpdateProgramSummary();UpdateEnabled();};
   Control<Slider>("Volume").PropertyChanged+=(_,e)=>{if(e.Property.Name=="Value")ApplyVolume();};
@@ -94,6 +94,9 @@ public partial class MainWindow : Window
    if(Program.Option("--verify-multi-selection") is {} multiFolder)await MultiSelectionVerification.RunAsync(this,multiFolder);
    if(Program.Option("--verify-ltc-settings") is {} ltcSettingsFolder)await LtcSettingsVerification.RunAsync(this,ltcSettingsFolder);
    if(Program.Option("--verify-cover-changes") is {} coverChangesFolder)await CoverChangesVerification.RunAsync(this,coverChangesFolder);
+   else if(Program.Option("--verify-direct-pcm") is {} pcmFolder)await DirectPcmVerification.RunAsync(this,pcmFolder);
+   else if(Program.Option("--verify-mp4-single-start") is {} singleFolder)await Mp4SingleStartVerification.RunAsync(this,singleFolder);
+   else if(Program.Option("--verify-media-analysis") is {} analysisFolder)await MediaAnalysisVerification.RunAsync(this,analysisFolder);
    else if(Program.Option("--verify-hap-preparation") is {} hapFolder)await HapPreparationVerification.RunAsync(this,hapFolder);
    else if(Program.Option("--verify-lost-editing") is {} lostFolder)await LostEditingVerification.RunAsync(this,lostFolder);
    else if(Program.Option("--verify-cue-editing") is {} editingFolder)await CueEditingVerification.RunAsync(this,editingFolder);
@@ -211,7 +214,7 @@ public partial class MainWindow : Window
  async void LoadClick(object? s,RoutedEventArgs e)
  {
   if(!CanEditProgram)return;var files=await StorageProvider.OpenFilePickerAsync(new(){Title="キューリストを開く",FileTypeFilter=[new("キューリスト"){Patterns=["*.json"]}]});
-  if(files.FirstOrDefault()?.TryGetLocalPath() is {} path)await Edit(async()=>{var load=await ShowProgramService.LoadAsync(path,CancellationToken.None);if(!DefinitionAuthority)return;if(SyncOwnsSurface){if(!await playback.ClearHeldSourceAsync())return;}else await Preview.ClearAsync();if(!DefinitionAuthority)return;previewCue=null;Editor.Replace(load);});
+  if(files.FirstOrDefault()?.TryGetLocalPath() is {} path)await Edit(async()=>{var load=await ShowProgramService.LoadAsync(path,CancellationToken.None,Preview.Analysis);if(!DefinitionAuthority)return;if(SyncOwnsSurface){if(!await playback.ClearHeldSourceAsync())return;}else await Preview.ClearAsync();if(!DefinitionAuthority)return;previewCue=null;Editor.Replace(load);});
  }
  internal async Task SeekAsync(){if(!updatingSeek&&SeekAccess.Allowed)await Safe(()=>Preview.SeekAsync(Control<Slider>("Seek").Value));}
  async void SeekKeyUp(object? s,KeyEventArgs e){if(e.Key is Key.Left or Key.Right or Key.Home or Key.End or Key.PageUp or Key.PageDown){try{await SeekAsync();}finally{keyboardSeeking=false;UpdatePreview(Preview.Snapshot);}}}

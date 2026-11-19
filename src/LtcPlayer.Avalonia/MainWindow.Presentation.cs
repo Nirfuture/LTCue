@@ -17,11 +17,11 @@ public partial class MainWindow
     foreach(var result in results){
      var row=Editor.Rows.FirstOrDefault(r=>r.CueId==result.Request.Id&&r.FilePath==result.Request.Path&&r.SourceRevision==result.Request.Revision&&r.MaterialStatusRevision==result.Request.StatusRevision);
      if(row==null)continue;
-     if(result.Info is {} info)row.AcceptMedia(info);else{Preview.IndexCache.Invalidate(row.FilePath);row.SourceError=result.Error;}
+     if(result.Info is {} info)row.AcceptMedia(info);else{Preview.Analysis.Invalidate(row.FilePath);row.SourceError=result.Error;}
      changed=true;
     }
     if(changed)Editor.Validate();
-   }),()=>Preview.IsBusy||playback.Audio.State is SharedAudioState.Preparing or SharedAudioState.Resyncing,()=>new MediaDecoder(reuseAnalysis:true,indexCache:Preview.IndexCache));
+   }),()=>Preview.IsBusy||playback.Audio.State is SharedAudioState.Preparing or SharedAudioState.Resyncing,()=>new MediaDecoder(reuseAnalysis:true,indexCache:Preview.IndexCache,analysis:Preview.Analysis),Preview.Analysis.Invalidate);
  }
 
  readonly DispatcherTimer coverTimer=new(){Interval=TimeSpan.FromMilliseconds(16)};
@@ -43,6 +43,7 @@ public partial class MainWindow
   });
   playback.MaterialFailed+=failure=>Dispatcher.UIThread.Post(()=>{
    if(closing||failure.SessionId!=playback.SynchronizationSession||!Editor.Rows.Any(r=>r.CueId==failure.Cue.CueId&&r.FilePath==failure.Cue.FilePath&&r.SourceRevision==failure.Cue.SourceRevision))return;
+   Preview.Analysis.Invalidate(failure.Cue.FilePath);
    foreach(var row in Editor.Rows.Where(r=>r.FilePath==failure.Cue.FilePath))row.SourceError=failure.Reason;
    Editor.Validate();
   });

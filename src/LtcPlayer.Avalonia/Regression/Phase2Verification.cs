@@ -81,7 +81,10 @@ public static class Phase2Verification
                 var play=new SynchronizedPlayback(window.Dispatcher).RunAsync(Path.Combine(folder,"media.mp4"),display,clock,0,0,t=>{lock(entries)entries.Add(t);},cancel.Token);
                 try
                 {
-                    await Task.Delay(150);
+                    // Probe startup is asynchronous. Begin the signal only after the
+                    // renderer has actually observed WAITING, rather than relying on
+                    // synchronous Process.Start to delay this test's UI continuation.
+                    while(true){bool waiting;lock(entries)waiting=entries.Any(t=>t.State==SyncState.WAITING);if(waiting)break;cancel.Token.ThrowIfCancellationRequested();await Task.Delay(10,cancel.Token);}
                     await Supply(clock,received,0,cancel.Token); await Task.Delay(600,cancel.Token);
                     await Supply(clock,received,10,cancel.Token);
                 }

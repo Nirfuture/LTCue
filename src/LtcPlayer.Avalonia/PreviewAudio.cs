@@ -73,18 +73,13 @@ public sealed class PreviewAudio : IAsyncDisposable
   finally{MediaDecoder.Kill(p);await errors;}
  }
  public async ValueTask DisposeAsync(){cancel.Cancel();await worker;cancel.Dispose();}
- public static async Task<PreviewAudioInfo> InspectAsync(string path,CancellationToken token)
+ public static async Task<PreviewAudioInfo> InspectAsync(string path,CancellationToken token,MediaAnalysisService? analysis=null)
  {
-  using var timeout=CancellationTokenSource.CreateLinkedTokenSource(token);timeout.CancelAfter(TimeSpan.FromSeconds(15));
-  StartupMeasurementTrace.Mark("selection_audio_probe_begin");
-  using var p=MediaDecoder.Start("ffprobe",["-v","error","-select_streams","a:0","-show_entries","stream=codec_name","-of","json",path]);
-  using var reg=timeout.Token.Register(()=>MediaDecoder.Kill(p));var output=p.StandardOutput.ReadToEndAsync();var errors=p.StandardError.ReadToEndAsync();
-  try{await p.WaitForExitAsync(timeout.Token);}catch(OperationCanceledException e)when(!token.IsCancellationRequested){throw new IOException("音声情報の取得がタイムアウト",e);}string detail=await errors;if(p.ExitCode!=0)throw new IOException(detail);
-  using var doc=JsonDocument.Parse(await output);var streams=doc.RootElement.GetProperty("streams");
-  StartupMeasurementTrace.Mark("selection_audio_probe_complete");
-  if(streams.GetArrayLength()==0)return new("",false,"音声なし");
-  string codec=streams[0].GetProperty("codec_name").GetString()??"";bool supported=codec=="aac"||codec.StartsWith("pcm_",StringComparison.Ordinal);
-  return new(codec,supported,supported?$"{codec}":$"音声形式非対応（{codec}）");
+  if(analysis==null){await using var temporary=new MediaAnalysisService();return await InspectAsync(path,token,temporary);}
+  string codec=(await analysis.GetAsync(path,token)).AudioCodec();
+  if(codec=="")return new("",false,"音声なし");
+  bool supported=codec=="aac"||codec.StartsWith("pcm_",StringComparison.Ordinal);
+  return new(codec,supported,supported?codec:$"音声形式非対応（{codec}）");
  }
  static void Check(int hr){if(hr<0)throw new IOException($"WASAPI preview failure 0x{hr:X8}");}
  static class Native

@@ -12,6 +12,7 @@ public sealed class AudioOutputService : IAsyncDisposable
 {
     sealed record Configuration(long Version,bool Enabled,string DeviceId,float Volume,bool Muted,TaskCompletionSource Applied);
     readonly Func<AudioPlayhead> readPlayhead;
+    readonly MediaAnalysisService analysis;readonly bool ownsAnalysis;
     readonly CancellationTokenSource stop=new();
     readonly Task worker;
     readonly bool hardwareSilence;
@@ -22,9 +23,9 @@ public sealed class AudioOutputService : IAsyncDisposable
     int disposed;
     public event Action<AudioPlayhead,string>? SourceFailed;
     public SharedAudioSnapshot Snapshot=>Volatile.Read(ref snapshot);
-    public AudioOutputService(Func<AudioPlayhead> readPlayhead,bool silenceForVerification=false,int preparationDelayMs=0)
+    public AudioOutputService(Func<AudioPlayhead> readPlayhead,bool silenceForVerification=false,int preparationDelayMs=0,MediaAnalysisService? analysis=null)
     {
-        this.readPlayhead=readPlayhead;hardwareSilence=silenceForVerification;this.preparationDelayMs=preparationDelayMs;
+        this.analysis=analysis??new();ownsAnalysis=analysis==null;this.readPlayhead=readPlayhead;hardwareSilence=silenceForVerification;this.preparationDelayMs=preparationDelayMs;
         worker=Task.Factory.StartNew(Run,CancellationToken.None,TaskCreationOptions.LongRunning,TaskScheduler.Default);
     }
     public Task ConfigureAsync(bool enabled,string deviceId,float volume,bool muted)
@@ -46,7 +47,6 @@ public sealed class AudioOutputService : IAsyncDisposable
     {
         AudioOutputSink? sink=null;AudioDecodeSession? decode=null;
         CancellationTokenSource? inspectionCancel=null;Task<AudioMediaInfo>? inspection=null;AudioMediaInfo? info=null;
-        var cache=new Dictionary<(string Path,long Length,DateTime Modified),AudioMediaInfo>();
         (Guid Session,Guid Cue,int Generation,string Path,int SourceRevision)? identity=null,failedSource=null;
         AudioPlayhead? currentSource=null;
         AudioPcmBlock? pending=null;int offset=0;bool epochStarted=false,running=false,suspended=true;
@@ -113,16 +113,14 @@ public sealed class AudioOutputService : IAsyncDisposable
                     if(identity!=key)
                     {
                         ResetSource();identity=key;policy=new();
-                        var file=new FileInfo(source.Path);var fileKey=ReadSource(()=>(file.FullName,file.Length,file.LastWriteTimeUtc));
-                        StartupMeasurementTrace.Mark("audio_analysis_begin",note:cache.ContainsKey(fileKey)?"cache hit":"cache miss");
-                        if(cache.TryGetValue(fileKey,out info))inspection=Task.FromResult(info);
-                        else{inspectionCancel=CancellationTokenSource.CreateLinkedTokenSource(stop.Token);inspection=AudioMediaInfo.InspectAsync(source.Path,inspectionCancel.Token);}
+                        StartupMeasurementTrace.Mark("audio_analysis_begin");
+                        inspectionCancel=CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
+                        inspection=AudioMediaInfo.InspectAsync(source.Path,inspectionCancel.Token,analysis);
                     }
                     if(info==null)
                     {
                         if(!inspection!.IsCompleted){Publish(SharedAudioState.Preparing,"音声解析中",source);stop.Token.WaitHandle.WaitOne(3);continue;}
                         info=ReadSource(()=>inspection.GetAwaiter().GetResult());StartupMeasurementTrace.Mark("audio_analysis_complete",note:"worker observed completion");CancelInspection();
-                        var file=new FileInfo(source.Path);if(cache.Count>=2)cache.Remove(cache.Keys.First());cache[ReadSource(()=>(file.FullName,file.Length,file.LastWriteTimeUtc))]=info;
                     }
                     StartupMeasurementTrace.Once("audio_analysis_available",note:"cached results bypass completion branch");
                     if(!info.Supported){Publish(SharedAudioState.NoAudio,info.Notice,source);stop.Token.WaitHandle.WaitOne(4);continue;}
@@ -156,6 +154,7 @@ public sealed class AudioOutputService : IAsyncDisposable
                         if(pending==null){if(!ReadSource(()=>decode.TryRead(out pending)))break;offset=0;}
                         int limit=(int)Math.Min(stats.Capacity,1440)-(int)stats.Padding;
                         var write=sink.Write(pending!,offset,maximumFrames:limit);if(write.Stale)throw new InvalidDataException("旧世代の音声を検出");
+                        if(write.Frames>0)StartupMeasurementTrace.Once("audio_first_write",pending!.Pts+offset/48000.0,"WASAPI write returned");
                         offset+=write.Frames;if(offset==pending!.Frames){pending=null;offset=0;}
                         stats=sink.Snapshot();if(write.Frames==0)break;
                     }
@@ -180,7 +179,7 @@ public sealed class AudioOutputService : IAsyncDisposable
                 catch(OperationCanceledException)when(stop.IsCancellationRequested){break;}
                 catch(SourceFailure e)
                 {
-                    failedSource=identity;ResetSource();Publish(SharedAudioState.Error,"音声エラー："+e.Message);if(currentSource!=null)SourceFailed?.Invoke(currentSource,e.Message);
+                    if(currentSource!=null)analysis.Invalidate(currentSource.Path);failedSource=identity;ResetSource();Publish(SharedAudioState.Error,"音声エラー："+e.Message);if(currentSource!=null)SourceFailed?.Invoke(currentSource,e.Message);
                 }
                 catch(Exception e)
                 {
@@ -194,6 +193,6 @@ public sealed class AudioOutputService : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         if(Interlocked.Exchange(ref disposed,1)!=0)return;
-        stop.Cancel();await worker;stop.Dispose();
+        stop.Cancel();await worker;stop.Dispose();if(ownsAnalysis)await analysis.DisposeAsync();
     }
 }

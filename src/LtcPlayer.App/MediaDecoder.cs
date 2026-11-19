@@ -10,71 +10,47 @@ public record VideoFrame(byte[] Pixels, double Seconds,int TextureFormat=0,int W
 {
     public double DecodeMilliseconds{get;init;}
 }
-public record MediaInfo(int Width, int Height, string Codec, double Duration=0, double FrameRate=0,double StartTime=0);
+public record MediaInfo(int Width, int Height, string Codec, double Duration=0, double FrameRate=0,double StartTime=0) { public MediaFileVersion? FileVersion{get;init;} }
 public sealed class MediaDecoder
 {
-    // Small metadata stays local; immutable HAP indexes use the bounded session cache.
-    readonly bool reuseAnalysis;
     readonly bool gpuScaling;
     readonly SemaphoreSlim analysisGate=new(1);
     internal int AnalysisRuns{get;private set;}
     internal int HapIndexBuilds{get;private set;}
-    (string Path,long Length,DateTime Modified,DateTime Created)? cachedFile;
-    MediaInfo? cachedInfo;
     readonly HapIndexCache? indexCache;
-    public MediaDecoder(bool reuseAnalysis=false,bool gpuScaling=false,HapIndexCache? indexCache=null){this.reuseAnalysis=reuseAnalysis;this.gpuScaling=gpuScaling;this.indexCache=indexCache??(reuseAnalysis?new HapIndexCache():null);}
-    static (string Path,long Length,DateTime Modified,DateTime Created) FileVersion(string path)
-    {
-        var file=new FileInfo(path);
-        return (file.FullName,file.Length,file.LastWriteTimeUtc,file.CreationTimeUtc);
-    }
+    readonly MediaAnalysisService? analysis;
+    public MediaDecoder(bool reuseAnalysis=false,bool gpuScaling=false,HapIndexCache? indexCache=null,MediaAnalysisService? analysis=null){this.gpuScaling=gpuScaling;this.analysis=analysis??(reuseAnalysis?new MediaAnalysisService():null);this.indexCache=indexCache??this.analysis?.IndexCache;}
     internal static string FfmpegTime(double seconds)=>seconds.ToString("0.#################",CultureInfo.InvariantCulture);
     internal static Process Start(string executable, IEnumerable<string> args)
     {
         var si = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var arg in args) si.ArgumentList.Add(arg);
-        try { return Process.Start(si) ?? throw new IOException(executable + " を起動できません"); }
+        try {
+#if VERIFICATION
+            string kind=executable=="ffprobe"?(si.ArgumentList.Contains("-show_packets")?"index_ffprobe":"info_ffprobe"):"decode_ffmpeg";
+            MediaProbeTrace.Mark(kind+"_start",si.ArgumentList.LastOrDefault()??"");
+#endif
+            var process=Process.Start(si) ?? throw new IOException(executable + " を起動できません");
+#if VERIFICATION
+            MediaProbeTrace.Mark(kind+"_started",process.Id.ToString());
+#endif
+            return process;
+        }
         catch (System.ComponentModel.Win32Exception e) { throw new IOException(executable + " が見つかりません（PATHを確認）", e); }
     }
     internal static void Kill(Process p) { try { if (!p.HasExited) p.Kill(true); } catch (InvalidOperationException) { } }
     public async Task<MediaInfo> InspectAsync(string path, CancellationToken cancellation)
     {
-        if (!File.Exists(path)) throw new FileNotFoundException("ファイルなし", path);
-        cancellation.ThrowIfCancellationRequested();
-        var version=reuseAnalysis?FileVersion(path):default;
-        if(reuseAnalysis && cachedFile==version && cachedInfo!=null)return cachedInfo;
-        if(indexCache?.FindInfo(path,cancellation) is {} shared&&FileVersion(path)==version){cachedFile=version;cachedInfo=shared;return shared;}
-        if(reuseAnalysis){cachedFile=null;cachedInfo=null;}
-        var ext=Path.GetExtension(path).ToLowerInvariant();if(ext is not (".mp4" or ".mov"))throw new InvalidDataException("対応形式：MP4/H.264、MOV/HAP・HAP Q");
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-        timeout.CancelAfter(TimeSpan.FromSeconds(15));
-        AnalysisRuns++;
-        using var p = Start("ffprobe", new[] { "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,codec_tag_string,width,height,duration,avg_frame_rate,start_time,sample_aspect_ratio:format=duration", "-of", "json", path });
-        using var registration = timeout.Token.Register(() => Kill(p));
-        var output = p.StandardOutput.ReadToEndAsync(); var error = p.StandardError.ReadToEndAsync();
-        try{await p.WaitForExitAsync(timeout.Token);}catch(OperationCanceledException e)when(!cancellation.IsCancellationRequested){throw new IOException("動画情報の取得がタイムアウト",e);}
-        var json = await output; var detail = await error;
-        if (p.ExitCode != 0) throw new InvalidDataException("動画情報の取得失敗：" + detail);
-        using var doc = JsonDocument.Parse(json);
-        var streams = doc.RootElement.GetProperty("streams");
-        if (streams.GetArrayLength() == 0) throw new InvalidDataException("映像トラックなし");
-        var s = streams[0];
-        var info = new MediaInfo(s.GetProperty("width").GetInt32(), s.GetProperty("height").GetInt32(), s.GetProperty("codec_name").GetString()!);
-        string tag=s.GetProperty("codec_tag_string").GetString()!;
-        if(ext==".mov" && info.Codec=="hap" && tag is "Hap1" or "HapY")info=info with{Codec=tag=="Hap1"?"hap":"hap_q"};
-        else if(ext!=".mp4" || info.Codec!="h264")throw new InvalidDataException("非対応形式："+tag+" / "+info.Codec);
-        if(info.Codec!="h264" && (info.Width%4!=0||info.Height%4!=0))throw new InvalidDataException("HAPの縦横サイズは4の倍数が必要です");
-        if(info.Codec!="h264" && s.TryGetProperty("sample_aspect_ratio",out var sar) && sar.GetString() is not ("1:1" or "0:1" or "N/A"))throw new InvalidDataException("HAPの非正方形ピクセルは非対応です");
-        if (info.Width <= 0 || info.Height <= 0 || info.Width > 8192 || info.Height > 8192) throw new InvalidDataException("映像サイズが範囲外");
-        double duration=0, fps=0;
-        if(s.TryGetProperty("duration",out var dur)) double.TryParse(dur.GetString(),NumberStyles.Float,CultureInfo.InvariantCulture,out duration);
-        if(duration<=0 && doc.RootElement.TryGetProperty("format",out var format) && format.TryGetProperty("duration",out dur)) double.TryParse(dur.GetString(),NumberStyles.Float,CultureInfo.InvariantCulture,out duration);
-        if(s.TryGetProperty("avg_frame_rate",out var rate)) {var parts=rate.GetString()!.Split('/');if(parts.Length==2 && double.TryParse(parts[0],NumberStyles.Float,CultureInfo.InvariantCulture,out var n) && double.TryParse(parts[1],NumberStyles.Float,CultureInfo.InvariantCulture,out var d) && d>0)fps=n/d;}
-        if(!double.IsFinite(duration)||duration<=0||!double.IsFinite(fps)||fps<=0)throw new InvalidDataException("再生時間・fpsを取得できません");
-        double startTime=0;if(s.TryGetProperty("start_time",out var st))double.TryParse(st.GetString(),NumberStyles.Float,CultureInfo.InvariantCulture,out startTime);
-        info=info with {Duration=duration,FrameRate=fps,StartTime=startTime};
-        if(reuseAnalysis && FileVersion(path)==version){cachedFile=version;cachedInfo=info;}
-        return info;
+        if(!File.Exists(path))throw new FileNotFoundException("ファイルなし",path);
+        if(Path.GetExtension(path).ToLowerInvariant() is not (".mp4" or ".mov"))throw new InvalidDataException("対応形式：MP4/H.264、MOV/HAP・HAP Q");
+        if(analysis!=null)return await InspectWithAsync(analysis,path,cancellation);
+        await using var temporary=new MediaAnalysisService();return await InspectWithAsync(temporary,path,cancellation);
+    }
+    async Task<MediaInfo> InspectWithAsync(MediaAnalysisService service,string path,CancellationToken token){
+        long before=service.ProbeRuns;
+        try{return (await service.GetAsync(path,token).ConfigureAwait(false)).Video();}
+        catch(InvalidDataException){service.Invalidate(path);throw;}
+        finally{AnalysisRuns+=(int)(service.ProbeRuns-before);}
     }
     public async IAsyncEnumerable<VideoFrame> DecodeAsync(string path, int width, int height, [EnumeratorCancellation] CancellationToken cancellation, double seekSeconds = 0,Action<MediaPreparationStage>? progress=null)
     {
@@ -149,5 +125,18 @@ public sealed class MediaDecoder
             if (p.ExitCode != 0) throw new InvalidDataException("映像の復号失敗：" + errors);
         }
         finally { Kill(p); await stderr; }
+    }
+}
+
+public static class MediaProbeTrace
+{
+#if VERIFICATION
+    public static Action<string,string>? Observer;
+#endif
+    [Conditional("VERIFICATION")]
+    public static void Mark(string name,string note=""){
+#if VERIFICATION
+        Observer?.Invoke(name,note);
+#endif
     }
 }

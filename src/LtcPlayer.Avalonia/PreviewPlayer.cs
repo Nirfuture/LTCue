@@ -11,7 +11,8 @@ public sealed class PreviewPlayer : IAsyncDisposable
     readonly SemaphoreSlim commands=new(1);
     readonly Stopwatch clock=new();
     readonly MediaDecoder decoder;
-    internal HapIndexCache IndexCache{get;}=new();
+    internal MediaAnalysisService Analysis{get;}=new();
+    internal HapIndexCache IndexCache=>Analysis.IndexCache;
     CancellationTokenSource? preparation,cancel;
     Task? loop;
     long request;
@@ -40,10 +41,11 @@ public sealed class PreviewPlayer : IAsyncDisposable
     internal Func<bool>? ManualAuthority{get;set;}
     bool AuthorityGranted=>ManualAuthority?.Invoke()??true;
     public string LoadedPath=>path;
+    internal bool LoadedVersionMatches{get{try{return media?.FileVersion==MediaFileVersion.Capture(path);}catch(Exception e)when(e is IOException or UnauthorizedAccessException or ArgumentException){return false;}}}
     public double FrameRate=>media?.FrameRate??0;
     public (int Width,int Height) MediaSize=>(media?.Width??0,media?.Height??0);
     public event Action<PreviewSnapshot>? Changed;
-    public PreviewPlayer(PreviewHost host){this.host=host;decoder=new(reuseAnalysis:true,gpuScaling:true,indexCache:IndexCache);}
+    public PreviewPlayer(PreviewHost host){this.host=host;decoder=new(reuseAnalysis:true,gpuScaling:true,indexCache:IndexCache,analysis:Analysis);}
     void Notify()=>Changed?.Invoke(Snapshot);
     void Activity(string message){IsBusy=message!="";BusyMessage=message;Notify();}
     void RejectManualUnavailable(){ObjectDisposedException.ThrowIf(disposed,this);if(syncOwnsSource)throw new InvalidOperationException("LTC同期中は操作できません");if(!AuthorityGranted)throw new OperationCanceledException("操作権限の変更により中止しました");}
@@ -53,9 +55,16 @@ public sealed class PreviewPlayer : IAsyncDisposable
     internal int LoadRequests{get;private set;}
     internal int StillDecodeStarts{get;private set;}
     internal Func<CancellationToken,Task>? LoadBeforeFrameForTest{get;set;}
+    internal Func<CancellationToken,Task>? LoadBeforePlayForTest{get;set;}
+    internal Func<FrameBuffer,CancellationToken,Task>? PreparedBufferForTest{get;set;}
+    internal VideoFrame? LastFrameForTest=>last;
     internal Func<CancellationToken,Task>? SeekBeforePresentForTest{get;set;}
 #endif
-    public async Task<bool> LoadAsync(string file)
+    public Task<bool> LoadAsync(string file)=>LoadCoreAsync(file,null);
+    // The callback is the UI adoption boundary of this one explicit play request.
+    // No prepared buffer escapes this method except by transfer to RunAsync.
+    internal Task<bool> LoadAndPlayAsync(string file,Func<bool> adopt)=>LoadCoreAsync(file,adopt);
+    async Task<bool> LoadCoreAsync(string file,Func<bool>? adopt)
     {
 #if VERIFICATION
         LoadRequests++;
@@ -63,27 +72,59 @@ public sealed class PreviewPlayer : IAsyncDisposable
         StartupMeasurementTrace.Mark("video_load_begin");
         RejectManualUnavailable();CancelPreparation();long version=request;
         using var operation=new CancellationTokenSource();preparation=operation;bool entered=false;
+        FrameBuffer? preparedBuffer=null;
+        bool combined=adopt!=null&&Path.GetExtension(file).Equals(".mp4",StringComparison.OrdinalIgnoreCase);
         try
         {
             await commands.WaitAsync(operation.Token);entered=true;RejectManualUnavailable();Activity("素材を確認中 "+Path.GetFileName(file));
             if(media!=null)position=CurrentPosition();
             await HaltAsync();state=media==null?PreviewState.Empty:PreviewState.Paused;
             var video=decoder.InspectAsync(file,operation.Token);
-            var sound=PreviewAudio.InspectAsync(file,operation.Token);
+            var sound=PreviewAudio.InspectAsync(file,operation.Token,Analysis);
             await Task.WhenAll(video,sound);
             StartupMeasurementTrace.Mark("selection_probes_complete");
 #if VERIFICATION
             if(LoadBeforeFrameForTest is {} beforeFrame)await beforeFrame(operation.Token);
 #endif
-            var frame=await FirstFrameAsync(file,0,operation.Token);
+            operation.Token.ThrowIfCancellationRequested();
+            var size=host.CanvasSize;
+            VideoFrame frame;
+            if(combined){
+                cancel=new();
+                preparedBuffer=new FrameBuffer(file,size.Width,size.Height,0,cancel.Token,decoder);
+                if(!await preparedBuffer.WaitForDataAsync(operation.Token)||!preparedBuffer.TryRead(out var first)||first==null)throw new InvalidDataException("表示できるフレームなし");
+                frame=first;
+            }else frame=await FirstFrameAsync(file,0,operation.Token);
             operation.Token.ThrowIfCancellationRequested();RejectManualUnavailable();if(version!=request)return false;
+            if(combined&&((await video).FileVersion!=MediaFileVersion.Capture(file)||size!=host.CanvasSize))return false;
             MediaSessionId=Guid.NewGuid();SourceGeneration++;media=await video;audioInfo=await sound;path=file;position=origin=0;errorNotice="";state=PreviewState.Ready;
             host.Present(frame);StartupMeasurementTrace.Once("video_first_present",frame.Seconds,"selection still; API returned");
-            firstFrame=last=frame;firstFrameSize=host.CanvasSize;presented++;Notify();return true;
+            firstFrame=last=frame;firstFrameSize=size;presented++;Notify();
+            if(!combined)return true;
+#if VERIFICATION
+            if(PreparedBufferForTest is {} prepared)await prepared(preparedBuffer!,operation.Token);
+            if(LoadBeforePlayForTest is {} beforePlay)await beforePlay(operation.Token);
+#endif
+            operation.Token.ThrowIfCancellationRequested();RejectManualUnavailable();
+            if(version!=request||!adopt!())return false;
+            operation.Token.ThrowIfCancellationRequested();RejectManualUnavailable();
+            if(version!=request||!LoadedVersionMatches||size!=host.CanvasSize)return false;
+            PlaybackSessionId=Guid.NewGuid();preparingPlayback=true;Notify();
+            if(audioInfo!.Supported&&!audioSuppressed){audio=new(path,0,media.Duration,muted?0:volume);await audio.ReadyAsync(cancel!.Token);}
+            operation.Token.ThrowIfCancellationRequested();cancel!.Token.ThrowIfCancellationRequested();RejectManualUnavailable();
+            if(version!=request||!LoadedVersionMatches||size!=host.CanvasSize)return false;
+            state=PreviewState.Playing;clock.Restart();StartupMeasurementTrace.Mark("video_clock_start");
+            if(audio!=null)await audio.SetPausedAsync(false,cancel.Token);
+            DecodeStarts++;var readyBuffer=preparedBuffer!;preparedBuffer=null;loop=RunAsync(cancel.Token,readyBuffer);Notify();return true;
         }
         catch(OperationCanceledException)when(operation.IsCancellationRequested||!AuthorityGranted){return false;}
         catch(Exception e){if(version==request){errorNotice=e.Message;Notify();}throw;}
-        finally{if(ReferenceEquals(preparation,operation)){preparation=null;Activity("");}if(entered)commands.Release();}
+        finally{
+            if(combined&&loop==null&&entered){await HaltAsync();if(state==PreviewState.Playing)state=PreviewState.Paused;}
+            if(preparedBuffer!=null)await preparedBuffer.DisposeAsync();
+            if(combined)preparingPlayback=false;
+            if(ReferenceEquals(preparation,operation)){preparation=null;Activity("");}if(entered)commands.Release();
+        }
     }
     public async Task PlayAsync()
     {
@@ -261,7 +302,7 @@ public sealed class PreviewPlayer : IAsyncDisposable
             }
         }
         catch(OperationCanceledException)when(token.IsCancellationRequested){}
-        catch(Exception e){state=PreviewState.Error;errorNotice=e.Message;clock.Stop();if(audio!=null){await audio.DisposeAsync();audio=null;}if(host.Ready&&host.Canvas.SharedDeviceError>=0){host.Black();last=null;}Notify();}
+        catch(Exception e){Analysis.Invalidate(path);state=PreviewState.Error;errorNotice=e.Message;clock.Stop();if(audio!=null){await audio.DisposeAsync();audio=null;}if(host.Ready&&host.Canvas.SharedDeviceError>=0){host.Black();last=null;}Notify();}
     }
     async Task HaltAsync()
     {
@@ -272,5 +313,6 @@ public sealed class PreviewPlayer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         disposed=true;CancelPreparation();cancel?.Cancel();await commands.WaitAsync();try{await HaltAsync();}finally{commands.Release();}
+        await Analysis.DisposeAsync();
     }
 }

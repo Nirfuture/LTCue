@@ -1,5 +1,5 @@
 using System.Buffers.Binary;
-using System.Text;
+using Atom = LtcPlayer.App.MovAtomReader.Atom;
 namespace LtcPlayer.App;
 
 // Fast path for self-contained, non-fragmented HAP MOVs with an unshifted timeline.
@@ -8,37 +8,19 @@ public static class MovHapIndex
 {
  const int MaxMetadata=64*1024*1024,MaxSamples=1_000_000;
  sealed class UnsupportedLayout:Exception;
- readonly record struct Atom(uint Type,ReadOnlyMemory<byte> Data);
+
  public sealed record Result(IReadOnlyList<HapMediaDecoder.Packet> Packets,long BytesRead);
- static uint Type(string value)=>BinaryPrimitives.ReadUInt32BigEndian(Encoding.ASCII.GetBytes(value));
  static InvalidDataException Bad()=>new("HAP位置情報の構造不正");
- static uint U32(ReadOnlyMemory<byte> data,int at){if(at<0||at>data.Length-4)throw Bad();return BinaryPrimitives.ReadUInt32BigEndian(data.Span.Slice(at,4));}
- static ulong U64(ReadOnlyMemory<byte> data,int at){if(at<0||at>data.Length-8)throw Bad();return BinaryPrimitives.ReadUInt64BigEndian(data.Span.Slice(at,8));}
- static List<Atom> Children(ReadOnlyMemory<byte> data)
- {
-  var result=new List<Atom>();int at=0;
-  while(at<data.Length){
-   if(result.Count>=100000||data.Length-at<8)throw Bad();
-   ulong size=U32(data,at);uint type=U32(data,at+4);int header=8;
-   if(size==1){size=U64(data,at+8);header=16;}else if(size==0)size=(ulong)(data.Length-at);
-   if(size<(ulong)header||size>(ulong)(data.Length-at))throw Bad();
-   result.Add(new(type,data.Slice(at+header,(int)size-header)));at+=(int)size;
-  }
-  return result;
- }
- static ReadOnlyMemory<byte> Required(List<Atom> atoms,string type)
- {
-  var found=atoms.Where(a=>a.Type==Type(type)).ToArray();if(found.Length!=1)throw Bad();return found[0].Data;
- }
- static ReadOnlyMemory<byte>? Optional(List<Atom> atoms,string type)
- {
-  var found=atoms.Where(a=>a.Type==Type(type)).ToArray();if(found.Length>1)throw Bad();if(found.Length==0)return null;return found[0].Data;
- }
+ static readonly MovAtomReader Atoms=new(Bad,()=>new UnsupportedLayout());
+ static uint Type(string value)=>MovAtomReader.Type(value);
+ static uint U32(ReadOnlyMemory<byte> b,int at)=>Atoms.U32(b,at);
+ static ulong U64(ReadOnlyMemory<byte> b,int at)=>Atoms.U64(b,at);
+ static ushort U16(ReadOnlyMemory<byte> b,int at)=>Atoms.U16(b,at);
+ static List<Atom> Children(ReadOnlyMemory<byte> b)=>Atoms.Children(b);
+ static ReadOnlyMemory<byte> Required(List<Atom> a,string t)=>Atoms.Required(a,t);
+ static ReadOnlyMemory<byte>? Optional(List<Atom> a,string t)=>Atoms.Optional(a,t);
  static void FullBox(ReadOnlyMemory<byte> data){if(U32(data,0)!=0)throw new UnsupportedLayout();}
- static int Count(ReadOnlyMemory<byte> data,int at,int start,int stride)
- {
-  uint count=U32(data,at);if(count>MaxSamples||start>data.Length||count>(data.Length-start)/stride)throw Bad();return (int)count;
- }
+ static int Count(ReadOnlyMemory<byte> b,int at,int start,int stride)=>Atoms.Count(b,at,start,stride,MaxSamples);
  public static async Task<Result?> TryReadAsync(string path,MediaInfo info,CancellationToken token)
  {
   if(info.Codec is not ("hap" or "hap_q")||Math.Abs(info.StartTime)>.000001)return null;
@@ -47,19 +29,7 @@ public static class MovHapIndex
  static async Task<Result> ReadAsync(string path,MediaInfo info,CancellationToken token)
  {
   await using var file=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read,8192,FileOptions.Asynchronous|FileOptions.RandomAccess);
-  var header=new byte[16];byte[]? moov=null;long read=0;var mediaRanges=new List<(long Start,long End)>();int boxes=0;
-  while(file.Position<file.Length){
-   token.ThrowIfCancellationRequested();if(++boxes>100000||file.Length-file.Position<8)throw Bad();long start=file.Position;
-   await file.ReadExactlyAsync(header.AsMemory(0,8),token);read+=8;ulong size=BinaryPrimitives.ReadUInt32BigEndian(header);uint type=BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(4));int length=8;
-   if(size==1){await file.ReadExactlyAsync(header.AsMemory(8,8),token);read+=8;size=BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(8));length=16;}else if(size==0)size=(ulong)(file.Length-start);
-   if(size<(ulong)length||size>(ulong)(file.Length-start))throw Bad();
-   if(type==Type("moof"))throw new UnsupportedLayout();
-   if(type==Type("moov")){
-    if(moov!=null||size-(ulong)length>MaxMetadata)throw new UnsupportedLayout();moov=new byte[(int)size-length];await file.ReadExactlyAsync(moov,token);read+=moov.Length;
-   }else if(type==Type("mdat"))mediaRanges.Add((start+length,start+(long)size));
-   file.Position=start+(long)size;
-  }
-  if(moov==null)throw Bad();
+  var (moov,mediaRanges,read)=await Atoms.ScanAsync(file,MaxMetadata,true,token);
   var movie=Children(moov);if(Optional(movie,"cmov")!=null||Optional(movie,"mvex")!=null)throw new UnsupportedLayout();
   foreach(var track in movie.Where(x=>x.Type==Type("trak"))){
    var trackAtoms=Children(track.Data);var mdia=Children(Required(trackAtoms,"mdia"));var handler=Required(mdia,"hdlr");
@@ -68,8 +38,7 @@ public static class MovHapIndex
    var stsd=Required(stbl,"stsd");FullBox(stsd);if(U32(stsd,4)!=1)throw new UnsupportedLayout();var descriptions=Children(stsd.Slice(8));if(descriptions.Count!=1)throw Bad();
    uint codec=descriptions[0].Type;if(codec!=(info.Codec=="hap"?Type("Hap1"):Type("HapY")))throw new UnsupportedLayout();
    var description=descriptions[0].Data;if(description.Length<8)throw Bad();if(BinaryPrimitives.ReadUInt16BigEndian(description.Span.Slice(6))!=1)throw new UnsupportedLayout();
-   var dinf=Children(Required(minf,"dinf"));var dref=Required(dinf,"dref");FullBox(dref);if(U32(dref,4)!=1)throw new UnsupportedLayout();var refs=Children(dref.Slice(8));if(refs.Count!=1)throw Bad();
-   if(refs[0].Type!=Type("url ")||U32(refs[0].Data,0)!=1)throw new UnsupportedLayout();
+   Atoms.SelfContainedReference(Required(Children(Required(minf,"dinf")),"dref"));
    var mdhd=Required(mdia,"mdhd");int version=(int)(U32(mdhd,0)>>24);if(version is not (0 or 1))throw new UnsupportedLayout();uint timescale=U32(mdhd,version==0?12:20);if(timescale==0)throw Bad();
    if(mediaRanges.Count==0)throw Bad();if(Optional(stbl,"stz2")!=null)throw new UnsupportedLayout();
    var sizes=Required(stbl,"stsz");FullBox(sizes);uint constant=U32(sizes,4);uint sampleCount=U32(sizes,8);if(sampleCount==0||sampleCount>MaxSamples)throw Bad();int count=(int)sampleCount;

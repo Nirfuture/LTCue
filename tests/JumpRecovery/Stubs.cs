@@ -4,8 +4,9 @@ namespace LtcPlayer.App {
  public record VideoFrame(byte[] Pixels,double Seconds,int TextureFormat=0,int Width=0,int Height=0);
  public record MediaInfo(double Duration=10,double FrameRate=25,string Codec="h264"){public int Width=>1920;public int Height=>1080;}
  public sealed class HapIndexCache {}
+ public sealed class MediaAnalysisService {public void Invalidate(string path){}}
  public sealed class MediaDecoder {
-  public MediaDecoder(bool reuseAnalysis=false,bool gpuScaling=false,HapIndexCache? indexCache=null){}
+  public MediaDecoder(bool reuseAnalysis=false,bool gpuScaling=false,HapIndexCache? indexCache=null,MediaAnalysisService? analysis=null){}
   public static int DelayMs=80;
   public static int PreparationMs;
   public static int Active,Peak;

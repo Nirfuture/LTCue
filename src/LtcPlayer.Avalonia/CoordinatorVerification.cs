@@ -12,9 +12,9 @@ public static class CoordinatorVerification
   async Task Until(Func<bool> condition){double end=MasterClock.Timestamp()+6;while(!condition()){if(MasterClock.Timestamp()>end)throw new TimeoutException(JsonSerializer.Serialize(new{c.Observation,c.Audio}));await Task.Delay(10);}}
   async Task Test(string name,Func<Task> body){try{await body();results.Add(new{test=name,status="PASS"});}catch(Exception e){failed=true;results.Add(new{test=name,status="FAIL",detail=e.ToString()});}File.WriteAllText(Path.Combine(folder,"results.json"),JsonSerializer.Serialize(results,new JsonSerializerOptions{WriteIndented=true}));}
   try{
-   var row=new CueRow{FilePath=Path.Combine(Program.Option("--fixtures")!,"h264-aac.mp4")};await ShowProgramService.RefreshAsync(row,CancellationToken.None);w.Editor.Add(row);
+   var row=new CueRow{FilePath=Path.Combine(Program.Option("--fixtures")!,"h264-aac-sync-30s.mp4")};await ShowProgramService.RefreshAsync(row,CancellationToken.None);w.Editor.Add(row);
    await c.ConfigureAudioAsync(true,"",.5f,false,true);
-   var other=new CueRow{FilePath=Path.Combine(Program.Option("--fixtures")!,"hap-pcm.mov")};other.SetStart("00:00:20:00");await ShowProgramService.RefreshAsync(other,CancellationToken.None);w.Editor.Add(other);
+   var other=new CueRow{FilePath=Path.Combine(Program.Option("--fixtures")!,"hap-pcm.mov")};other.SetStart("00:00:40:00");await ShowProgramService.RefreshAsync(other,CancellationToken.None);w.Editor.Add(other);
    await Test("manual reorder preserves playback decoder and audio stream",async()=>{
     await w.Preview.LoadAsync(row.FilePath);await w.Preview.PlayAsync();await Until(()=>c.Audio.State==SharedAudioState.Playing&&w.Preview.Snapshot.Position>.15);
     var video=w.Preview.PlaybackSessionId;var media=w.Preview.MediaSessionId;int decodes=w.Preview.DecodeStarts;var sink=c.Audio.SinkSession;int preparations=c.Audio.PreparationStarts;double before=w.Preview.Snapshot.Position;
@@ -31,12 +31,14 @@ public static class CoordinatorVerification
     await w.PlayCueForTestAsync(other);await Until(()=>w.Preview.Snapshot.State==PreviewState.Playing&&w.Preview.LoadedPath==other.FilePath);
 
    });
-   await w.Monitor.ConfigureAsync(new(Rate:"29.97 DF"),async(clock,token)=>{while(!token.IsCancellationRequested){if(Volatile.Read(ref receiving)!=0){int f=Interlocked.Increment(ref frames);if(f>110){Interlocked.Exchange(ref frames,15);f=15;}clock.Accept(new TcFrame{Seconds=f/30,Frame=f%30,Drop=1},MasterClock.Timestamp());}await Task.Delay(33,token);}});
+   await w.Monitor.ConfigureAsync(new(Rate:"29.97 DF"),async(clock,token)=>{while(!token.IsCancellationRequested){if(Volatile.Read(ref receiving)!=0){int f=Interlocked.Increment(ref frames);clock.Accept(new TcFrame{Seconds=f/30,Frame=f%30,Drop=1},MasterClock.Timestamp());}await Task.Delay(33,token);}});
    await Test("LTC session owns one generation-scoped playhead",async()=>{
     await Until(()=>c.Observation?.FramePts>0&&c.Audio.State==SharedAudioState.Playing);var head=c.ReadAudioPlayhead();Check(head.SessionId==c.SynchronizationSession&&head.CueId==row.CueId&&head.LtcDriven,"source identities diverged");Check(head.Generation==c.Observation!.InputGeneration&&w.Preview.IsSyncOwned,"ownership mismatch");
    });
    await Test("LTC reorder and unchanged validation preserve generation and audio",async()=>{
-    Interlocked.Exchange(ref frames,15);await Task.Delay(100);await Until(()=>c.Audio.State==SharedAudioState.Playing&&c.Audio.Generation==c.ReadAudioPlayhead().Generation&&c.Observation?.InputGeneration==c.ReadAudioPlayhead().Generation&&Math.Abs((c.Observation?.FramePts??-10)-c.ReadAudioPlayhead().Position)<.15);
+    // Keep input monotonic during reorder; jumps and short-fixture wraparound
+    // would independently trigger recovery and invalidate the preservation check.
+    await Until(()=>c.Audio.State==SharedAudioState.Playing&&c.Audio.Generation==c.ReadAudioPlayhead().Generation&&c.Observation?.InputGeneration==c.ReadAudioPlayhead().Generation&&Math.Abs((c.Observation?.FramePts??-10)-c.ReadAudioPlayhead().Position)<.15);
     var sync=c.SynchronizationSession;var canvas=w.Surface.Canvas.SessionId;var clock=w.Monitor.Clock;var head=c.ReadAudioPlayhead();var sink=c.Audio.SinkSession;int preparations=c.Audio.PreparationStarts;int inputStarts=w.Monitor.Starts;double? before=c.Observation!.FramePts;
     w.MoveCue(row,0);w.Editor.Validate();await Task.Delay(220);
     Check(c.SynchronizationSession==sync&&w.Surface.Canvas.SessionId==canvas&&ReferenceEquals(clock,w.Monitor.Clock)&&w.Monitor.Starts==inputStarts,"reorder replaced sync/canvas/input");

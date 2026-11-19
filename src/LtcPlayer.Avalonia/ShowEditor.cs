@@ -4,6 +4,7 @@ using LtcPlayer.App;
 namespace LtcPlayer.Avalonia;
 public sealed class ShowEditor
 {
+ public MediaAnalysisService? Analysis{get;set;}
  public ObservableCollection<CueRow> Rows{get;}=[];
  public TimecodeRate Rate{get;set;}=TimecodeRate.Modes[1];
  public bool Locked=>DefinitionAuthority?.Invoke()==false;
@@ -50,7 +51,7 @@ public sealed class ShowEditor
  public void Move(CueRow row,int target){if(!(ReorderAuthority?.Invoke()??!Locked))throw new InvalidOperationException("現在は並べ替えできません");if(Rows.Contains(row)){Rows.Move(Rows.IndexOf(row),Math.Clamp(target,0,Rows.Count-1));Renumber();}}
  public async Task ImportAsync(IEnumerable<string> paths,string start,CuePlacementPreferences? placement=null)
  {
-  Editable();var prepared=new List<CueRow>();foreach(var path in paths){var row=new CueRow{FilePath=Path.GetFullPath(path)};row.SetStart(start);try{await ShowProgramService.RefreshAsync(row,CancellationToken.None);}catch(Exception e){row.SourceError=e.Message;}prepared.Add(row);}
+  Editable();var prepared=new List<CueRow>();foreach(var path in paths){var row=new CueRow{FilePath=Path.GetFullPath(path)};row.SetStart(start);try{await ShowProgramService.RefreshAsync(row,CancellationToken.None,Analysis);}catch(Exception e){row.SourceError=e.Message;}prepared.Add(row);}
 #if VERIFICATION
   if(BeforeImportApplyForTest!=null)await BeforeImportApplyForTest();
 #endif
@@ -67,7 +68,7 @@ public sealed class ShowEditor
  }
  public async Task LoadAsync(string file)
  {
-  Editable();var load=await ShowProgramService.LoadAsync(file,CancellationToken.None);Editable();
+  Editable();var load=await ShowProgramService.LoadAsync(file,CancellationToken.None,Analysis);Editable();
   Replace(load);
  }
  public void Replace((TimecodeRate Rate,List<CueRow> Rows,List<string> Notices) load)
