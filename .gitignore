@@ -9,3 +9,7 @@ artifacts/
 **/sync-logs/
 *.user
 *.suo
+
+# Generated long-duration test videos (regenerate with adjacent scripts)
+/TestMedia/LongTest-*/test-4min-*.mp4
+/TestMedia/LongTest-*/test-4min-*.mov
