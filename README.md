@@ -2,7 +2,7 @@
 
 LTCueは、LTC（音声タイムコード）に合わせて動画を再生し、外部ディスプレイへ映像を出力するWindows用ツールです。複数の動画をキューに登録し、動画ごとに再生を開始するタイムコードを指定できます。
 
-![LTCueの操作画面。29.97 DFのLTC受信中に、FHDのHAP動画を同期再生。Opening、Session、Transition、Closingのキューを登録。](docs/images/readme-overview.jpg)
+![LTCueの操作画面。29.97 DFのLTC受信中に、FHDのHAP動画を同期再生。Opening、Session、Transition、Closingのキューを登録。](docs/images/readme-hap-overview.jpg)
 
 MP4/H.264、MOV/HAP・HAP Qに対応しています。
 <br>手動再生、動画の音声プレビュー、蓋絵への切り替えにも対応しています。
