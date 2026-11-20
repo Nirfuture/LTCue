@@ -1,34 +1,35 @@
-# 資料・構成の案内
+# 資料の案内
 
-利用者向け：[クイックスタート](QUICKSTART.md)・[操作リファレンス](USER_GUIDE.md)・[対応環境](COMPATIBILITY.md)・[困ったとき](TROUBLESHOOTING.md)。
+LTCueの使い方、開発手順、技術資料をまとめています。
 
-開発：[現行仕様](FINAL_SPEC.md)・[ビルド](BUILD.md)・[検証](VERIFICATION.md)・[リリース作成](RELEASING.md)。
+## 利用者向け
 
-| 場所 | 内容 |
+初めて使う場合は、クイックスタートから参照してください。
+
+| 資料 | 内容 |
 |---|---|
-| src/LtcPlayer.Avalonia | UI、再生、音声。Playbackは現行、Regressionは旧試験専用 |
-| src/LtcPlayer.App | 本体へ取り込む共通時計・入力・素材処理。独立アプリではない |
-| native | C++のLTC入力、WASAPI、GPU描画 |
-| tests / scripts | 同期計算検証、ビルド・試験・配布手順。scripts/legacyは旧個別入口 |
-| TestMedia | 初期デモにも使用するHAP動画4本とLTC音源 |
-| LICENSES / third_party | 依存ライセンスとlibltcソース |
-| docs/history | 過去の仕様・計画・進捗・レビュー |
+| [クイックスタート](guides/QUICKSTART.md) | 準備から映像を出すまでの基本操作 |
+| [操作リファレンス](guides/USER_GUIDE.md) | 各機能・設定の詳しい使い方 |
+| [対応環境](guides/COMPATIBILITY.md) | 必要な環境と対応する動画形式 |
+| [困ったとき](guides/TROUBLESHOOTING.md) | 起動・再生・接続の問題への対処 |
 
-## 現在の調査記録
+## 開発者向け
 
-- [環境A：検証完了・開始遅延調査の引き継ぎ（2026-11-19）](HANDOFF_ENV_A_2026-11-19.md)
-- [環境A：一括検証と検証側修正の記録（2026-11-19）](ENV_A_VERIFICATION_2026-11-19.md)
-- [検証環境Aの開始計測](STARTUP_CHECK_ENV_A.md)
-- [検証環境Bとの比較](STARTUP_CHECK_ENV_B.md)
-- [検証環境Aのプロセス起動診断](STARTUP_PROCESS_LAUNCH_ENV_A.md)
-- [引き継ぎ時点の記録](HANDOFF_2026-11-13.md)（以後の結果は上記を参照）
+### 仕様・開発
 
-[旧資料の案内](history/README.md)・[各版の確認記録](releases)。生成物、端末設定、生ログはGitへ追加しない。
+| 資料 | 内容 |
+|---|---|
+| [現行仕様](development/FINAL_SPEC.md) | 現在の機能・動作・操作条件の基準 |
+| [ビルド](development/BUILD.md) | 開発環境の準備とビルド手順 |
+| [検証](development/VERIFICATION.md) | 自動試験・手動確認の実行方法と判定基準 |
+| [実装補足](development/implementation/README.md) | 所有権・資源の寿命・失敗や取消時の内部処理 |
+| [保守手順](maintenance/README.md) | 配色などの変更方法と確認事項 |
+| [開発履歴](history/README.md) | 過去の仕様・計画・調査・実装記録 |
 
-配布用READMEの原稿はDISTRIBUTION_README.mdです。配布時にアプリ直下へ置くため、その相対リンクは配布後の位置を基準にしています。
+### 配布
 
-## 過去の検証記録
-
-検証記録・履歴資料に記載したコミットIDは、移行前の開発履歴を識別するものです。新リポジトリのコミットIDではありません。数値は当時の条件で得た結果であり、移行後の再ビルドに対する検証結果とは区別します。
-
-履歴・測定記録・画像にあるLTC Playerや旧実行ファイル名は、名称変更前のものです。LTCueへの名称変更後に再検証したことを示しません。
+| 資料 | 内容 |
+|---|---|
+| [配布方針](distribution/DISTRIBUTION.md) | 配布形式と署名の扱い |
+| [リリース作成](distribution/RELEASING.md) | 配布物の作成・確認・公開手順 |
+| [版別確認記録](releases) | リリースごとの検証結果と未確認事項 |

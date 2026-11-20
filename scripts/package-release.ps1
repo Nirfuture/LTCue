@@ -69,8 +69,8 @@ try {
  foreach($name in @('LICENSE','NOTICE.md','RELEASE_NOTES.md')){Copy-Item -LiteralPath (Join-Path $source $name) -Destination $app}
  foreach($name in @('LICENSES')){$destination=Join-Path $app $name;New-Item -ItemType Directory -Force $destination | Out-Null;Get-ChildItem -LiteralPath (Join-Path $source $name) -Force | ForEach-Object {Copy-Item -LiteralPath $_.FullName -Destination $destination -Recurse -Force}}
  # User documentation is an explicit allowlist. Development history remains in source.zip.
- Copy-Item -LiteralPath (Join-Path $source 'docs/DISTRIBUTION_README.md') -Destination (Join-Path $app 'README.md')
- $distributionDocs=@('QUICKSTART.md','USER_GUIDE.md','COMPATIBILITY.md','TROUBLESHOOTING.md','images/quickstart-display.png','images/quickstart-input.png','images/quickstart-output-start.png','images/quickstart-queue.png','images/reference-cover.png','images/reference-playback-order.png','images/reference-playback-order-error.png','asset-licenses.json','package-licenses.json','dependencies.json',('releases/'+$Version+'.md'))
+ Copy-Item -LiteralPath (Join-Path $source 'docs/distribution/DISTRIBUTION_README.md') -Destination (Join-Path $app 'README.md')
+ $distributionDocs=@('guides/QUICKSTART.md','guides/USER_GUIDE.md','guides/COMPATIBILITY.md','guides/TROUBLESHOOTING.md','images/quickstart-display.png','images/quickstart-input.png','images/quickstart-output-start.png','images/quickstart-queue.png','images/reference-cover.png','images/reference-playback-order.png','images/reference-playback-order-error.png','metadata/asset-licenses.json','metadata/package-licenses.json','metadata/dependencies.json',('releases/'+$Version+'.md'))
  foreach($relative in $distributionDocs){
   $destination=Join-Path $app ('docs/'+$relative)
   New-Item -ItemType Directory -Force (Split-Path $destination -Parent) | Out-Null
@@ -88,7 +88,7 @@ try {
  foreach($required in @('LTCue.exe','LTCue.dll','AudioNative.dll','PlayerNative.dll','TestMedia/HAP_1_1080p_2997_10s.mov','TestMedia/LTC_29.97DF_from-zero.wav','LICENSES/LGPL-3.0.txt','NOTICE.md','coreclr.dll','hostfxr.dll','CorrespondingSource/third_party/libltc/COPYING')){
   if(-not(Test-Path -LiteralPath (Join-Path $app $required) -PathType Leaf)){throw "Missing package file: $required"}
  }
- if(Test-Path -LiteralPath (Join-Path $source 'src/LtcPlayer.Avalonia/LucideIcon.cs')){foreach($required in @('LICENSES/Lucide.txt','docs/asset-licenses.json')){if(-not(Test-Path -LiteralPath (Join-Path $app $required))){throw "Missing asset license: $required"}}}
+ if(Test-Path -LiteralPath (Join-Path $source 'src/LtcPlayer.Avalonia/LucideIcon.cs')){foreach($required in @('LICENSES/Lucide.txt','docs/metadata/asset-licenses.json')){if(-not(Test-Path -LiteralPath (Join-Path $app $required))){throw "Missing asset license: $required"}}}
  $runtime=Get-Content -LiteralPath (Join-Path $app 'LTCue.runtimeconfig.json') -Raw | ConvertFrom-Json
  if(-not $runtime.runtimeOptions.includedFrameworks){throw 'Package must be self-contained.'}
  if(Test-Path -LiteralPath (Join-Path $app 'phase2-settings.json')){throw 'Package must not contain local user settings.'}

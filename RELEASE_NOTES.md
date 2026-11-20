@@ -15,7 +15,7 @@ LTCueの初回プレビューリリースです。Windows 11 x64向けのLTC同�
 
 ZIPをフォルダーごと展開し、LTCue.exeを起動します。.NETランタイム同梱。Visual C++ v14 x64ランタイムとFFmpeg/ffprobeは別途必要です。
 
-[クイックスタート](docs/QUICKSTART.md)・[対応環境](docs/COMPATIBILITY.md)・[困ったとき](docs/TROUBLESHOOTING.md)
+[クイックスタート](docs/guides/QUICKSTART.md)・[対応環境](docs/guides/COMPATIBILITY.md)・[困ったとき](docs/guides/TROUBLESHOOTING.md)
 
 音声出力機能は確認用です。素材や環境によって再生準備に時間がかかる場合があります。
 

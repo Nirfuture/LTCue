@@ -42,7 +42,7 @@ LTCue独自のC#アプリケーションコードと`native/phase5`のコード�
 
 ## NuGetパッケージと.NETランタイム
 
-NuGetパッケージのライセンスと表示は、[LICENSES/NuGet/](LICENSES/NuGet/)および[docs/package-licenses.json](docs/package-licenses.json)に収録しています。
+NuGetパッケージのライセンスと表示は、[LICENSES/NuGet/](LICENSES/NuGet/)および[docs/metadata/package-licenses.json](docs/metadata/package-licenses.json)に収録しています。
 
 Skia、HarfBuzz、ANGLEについては、上流の第三者ライセンス表示を保持しています。.NETランタイムの[ライセンス](LICENSES/dotnet-runtime-LICENSE.txt)と[表示](LICENSES/dotnet-runtime-NOTICES.txt)も同梱しています。
 
@@ -60,4 +60,4 @@ FFmpegに適用されるライセンスは、そのビルド構成によって�
 
 LucideアイコンのSVGパスを[src/LtcPlayer.Avalonia/Assets/Lucide/](https://github.com/Nirfuture/LTCue/tree/main/src/LtcPlayer.Avalonia/Assets/Lucide)に収録し、[LucideIcon.cs](https://github.com/Nirfuture/LTCue/blob/main/src/LtcPlayer.Avalonia/LucideIcon.cs)で描画しています。
 
-ISCライセンスと、Feather由来のアイコンに関するMITライセンス表示は、[LICENSES/Lucide.txt](LICENSES/Lucide.txt)に収録しています。このファイルは実行用ZIPにも同梱しています。詳細は[docs/asset-licenses.json](docs/asset-licenses.json)を参照してください。
+ISCライセンスと、Feather由来のアイコンに関するMITライセンス表示は、[LICENSES/Lucide.txt](LICENSES/Lucide.txt)に収録しています。このファイルは実行用ZIPにも同梱しています。詳細は[docs/metadata/asset-licenses.json](docs/metadata/asset-licenses.json)を参照してください。
